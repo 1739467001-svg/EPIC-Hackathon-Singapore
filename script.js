@@ -761,8 +761,8 @@ class TeamMatchingEngine {
         // Rewards complementary skills, penalizes overlap
         const skillComplementarity = this.calculateSkillComplementarity(profile1.skills, profile2.skills);
         score += skillComplementarity.score;
-        if (skillComplementary.reasons.length > 0) {
-            reasons.push(...skillComplementary.reasons);
+        if (skillComplementarity.reasons.length > 0) {
+            reasons.push(...skillComplementarity.reasons);
         }
 
         // 2. Role Balance Scoring (max 20 points)
@@ -1426,7 +1426,7 @@ function getOriginalProfilesHTML() {
             </div>
             <h4 class="profile-name">Marcus Johnson</h4>
             <p class="profile-role">AI Engineer</p>
-div class="profile-tags">
+<div class="profile-tags">
                 <span class="tag">Python</span><span class="tag">PyTorch</span><span class="tag">LLMs</span>
             </div>
             <p class="profile-bio">PhD in ML from MIT. Published researcher. Building the next generation of AI agents.</p>
@@ -1724,7 +1724,7 @@ const matchingStyles = `
 .match-badge.great { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; }
 .match-badge.good { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
 .match-badge.possible { background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; }
-.match-badge.low { background: linear-gradient(135, #ef4444, #dc2626); color: white; }
+.match-badge.low { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
 
 .match-icon { font-size: 14px; }
 .match-score { font-size: 13px; font-weight: 700; opacity: 0.95; }
