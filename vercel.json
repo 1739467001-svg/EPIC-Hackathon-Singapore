@@ -1,0 +1,1 @@
+{"version": 2, "name": "epic-hackathon", "builds": [{"src": "package.json", "use": "@vercel/static", "config": {"distDir": "."}}], "routes": [{"src": "/(.*)", "dest": "/index.html"}]}

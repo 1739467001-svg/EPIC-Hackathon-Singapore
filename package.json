@@ -1,0 +1,1 @@
+{"name": "epic-hackathon", "version": "1.0.0", "description": "EPIC Hackathon Singapore - 48-Hour AI Product Build", "main": "server.js", "scripts": {"start": "node server.js"}, "keywords": ["hackathon", "ai", "team-matching", "epic"], "author": "KINGKAZMAX", "license": "MIT"}
