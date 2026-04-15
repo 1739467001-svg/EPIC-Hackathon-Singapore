@@ -289,7 +289,7 @@ async function oauthLogin(provider) {
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider: providerMap[provider],
         options: {
-            redirectTo: `${window.location.origin}/index.html`,
+            redirectTo: 'http://43.130.98.104:8080/index.html',
             queryParams: provider === 'google' ? { access_type: 'offline', prompt: 'select_account' } : {}
         }
     });
