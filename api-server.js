@@ -31,6 +31,7 @@ const SMTP = {
 };
 
 const pending = new Map();
+const otpStore = new Map(); // email -> { code, expiresAt, attempts }
 
 const transporter = nodemailer.createTransport({
     host: SMTP.host,
@@ -232,6 +233,82 @@ const server = http.createServer(async (req, res) => {
         } catch (err) {
             console.error('[resend]', err.message);
             return json(res, 500, { error: 'Failed to resend email.' });
+        }
+    }
+
+    /* POST /api/send-otp */
+    if (pathname === '/api/send-otp' && req.method === 'POST') {
+        try {
+            const body = await parseBody(req);
+            const { email } = body;
+            if (!email) return json(res, 400, { error: 'Email is required.' });
+
+            // Check user exists and is verified
+            const rows = await supabaseQuery('players',
+                'email=eq.' + encodeURIComponent(email) + '&verified=eq.true&select=email'
+            );
+            if (!rows || rows.length === 0) {
+                return json(res, 404, { error: 'No account found for this email. Please register first.' });
+            }
+
+            // Generate 6-digit OTP
+            const code      = String(Math.floor(100000 + Math.random() * 900000));
+            const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+            otpStore.set(email, { code, expiresAt, attempts: 0 });
+
+            // Send OTP email
+            const otpHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;"><tr><td style="background:#000;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.07);"><span style="font-size:22px;font-weight:900;color:#fff;">EPIC</span><span style="font-size:13px;color:rgba(255,255,255,0.4);margin-left:12px;">Hackathon Singapore</span></td></tr><tr><td style="padding:36px 36px 28px;"><h1 style="font-size:24px;font-weight:800;color:#fff;margin:0 0 12px;">Your sign-in code</h1><p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 28px;">Use the code below to sign in to your EPIC account. This code expires in <strong style="color:#fff;">10 minutes</strong>.</p><div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:16px;padding:28px;text-align:center;margin-bottom:24px;"><span style="font-size:48px;font-weight:900;letter-spacing:12px;color:#22C55E;font-family:monospace;">' + code + '</span></div><p style="font-size:13px;color:rgba(255,255,255,0.35);margin:0;line-height:1.6;">If you did not request this code, you can safely ignore this email. Do not share this code with anyone.</p></td></tr><tr><td style="background:rgba(255,255,255,0.025);padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);"><p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">&copy; 2026 EPIC Hackathon Singapore &nbsp;&middot;&nbsp;<a href="' + BASE_URL + '" style="color:rgba(255,255,255,0.35);text-decoration:none;">Visit Website</a></p></td></tr></table></td></tr></table></body></html>';
+
+            await transporter.sendMail({
+                from: '"EPIC Hackathon Singapore" <' + SMTP.auth.user + '>',
+                to: email,
+                subject: 'Your EPIC sign-in code: ' + code,
+                html: otpHtml
+            });
+
+            return json(res, 200, { ok: true, message: 'Verification code sent to ' + email });
+        } catch (err) {
+            console.error('[send-otp]', err.message);
+            return json(res, 500, { error: 'Failed to send verification code. Please try again.' });
+        }
+    }
+
+    /* POST /api/verify-otp */
+    if (pathname === '/api/verify-otp' && req.method === 'POST') {
+        try {
+            const body = await parseBody(req);
+            const { email, code } = body;
+            if (!email || !code) return json(res, 400, { error: 'Email and code are required.' });
+
+            const entry = otpStore.get(email);
+            if (!entry) return json(res, 400, { error: 'No verification code found. Please request a new one.' });
+
+            if (Date.now() > entry.expiresAt) {
+                otpStore.delete(email);
+                return json(res, 400, { error: 'Verification code has expired. Please request a new one.' });
+            }
+
+            entry.attempts++;
+            if (entry.attempts > 5) {
+                otpStore.delete(email);
+                return json(res, 429, { error: 'Too many attempts. Please request a new code.' });
+            }
+
+            if (entry.code !== String(code).trim()) {
+                return json(res, 400, { error: 'Incorrect code. Please try again (' + (5 - entry.attempts) + ' attempts left).' });
+            }
+
+            otpStore.delete(email);
+
+            // Fetch user info
+            const rows = await supabaseQuery('players',
+                'email=eq.' + encodeURIComponent(email) + '&select=email,first_name,last_name'
+            );
+            const user = rows && rows[0] ? rows[0] : { email };
+            return json(res, 200, { ok: true, user: { email: user.email, firstName: user.first_name, lastName: user.last_name } });
+        } catch (err) {
+            console.error('[verify-otp]', err.message);
+            return json(res, 500, { error: 'Verification failed. Please try again.' });
         }
     }
 

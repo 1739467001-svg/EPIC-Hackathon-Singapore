@@ -1,12 +1,12 @@
 /**
  * EPIC Hackathon Singapore — Auth Logic
- * auth.js  (v3 — split layout, email-only sign in / create account)
+ * auth.js  (v4 — dual sign-in: password + OTP)
  */
 
 const API_BASE = 'http://43.130.98.104:8080/api';
 
-let pendingEmail = null;
-let pendingRole  = 'player';
+let pendingEmail    = null;
+let otpCountdownTimer = null;
 
 /* ============================================================
    Page Init
@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (params.get('verified') === '1') {
         switchTab('signin');
         showToast('Email verified! Your account is ready. Please sign in.', 'info');
-        // Pre-clean URL
         history.replaceState({}, '', window.location.pathname);
         return;
     }
@@ -35,22 +34,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Form submit listeners
-    const fsi = document.getElementById('form-signin');
-    const fsu = document.getElementById('form-signup');
-    if (fsi) fsi.addEventListener('submit', handleSignIn);
-    if (fsu) fsu.addEventListener('submit', handleSignUp);
+    const fsi  = document.getElementById('form-signin');
+    const fsu  = document.getElementById('form-signup');
+    const fotp = document.getElementById('form-otp');
+    if (fsi)  fsi.addEventListener('submit', handleSignIn);
+    if (fsu)  fsu.addEventListener('submit', handleSignUp);
+    if (fotp) fotp.addEventListener('submit', handleOTPVerify);
 });
 
 /* ============================================================
    Tab / Panel Navigation
    ============================================================ */
 function switchTab(tab) {
-    // Update tab buttons
     document.querySelectorAll('.auth-tab').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tab);
     });
-
-    // Show correct panel
     const panelId = tab === 'signin' ? 'panel-signin' : 'panel-signup';
     showPanel(panelId);
 }
@@ -68,6 +66,25 @@ function hideTabs() {
 }
 
 /* ============================================================
+   Sign In Method Sub-Tabs (Password / OTP)
+   ============================================================ */
+function switchSigninMethod(method) {
+    // Update sub-tab buttons
+    document.querySelectorAll('.signin-method-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.method === method);
+    });
+    // Show correct method panel
+    document.querySelectorAll('.signin-method-panel').forEach(p => p.classList.remove('active'));
+    const panel = document.getElementById('method-' + method);
+    if (panel) panel.classList.add('active');
+
+    // Clear errors when switching
+    clearError('signin-error');
+    clearError('otp-send-error');
+    clearError('otp-verify-error');
+}
+
+/* ============================================================
    Password Toggle
    ============================================================ */
 function togglePassword(inputId, btn) {
@@ -75,9 +92,7 @@ function togglePassword(inputId, btn) {
     if (!input) return;
     const isHidden = input.type === 'password';
     input.type = isHidden ? 'text' : 'password';
-
-    // Swap icon
-    const icon = btn.querySelector('.eye-icon');
+    const icon = btn.querySelector('svg');
     if (icon) {
         icon.innerHTML = isHidden
             ? `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`
@@ -125,7 +140,7 @@ function setLoading(btnId, loading) {
 }
 
 /* ============================================================
-   Sign In
+   Sign In — Password Method
    ============================================================ */
 async function handleSignIn(e) {
     e.preventDefault();
@@ -154,11 +169,142 @@ async function handleSignIn(e) {
         }
 
         // Successful login — redirect to homepage
-        window.location.href = 'index.html';
+        window.location.href = 'http://43.130.98.104:8080/index.html';
     } catch {
         showError('signin-error', 'Network error. Please check your connection and try again.');
         setLoading('signin-submit-btn', false);
     }
+}
+
+/* ============================================================
+   Sign In — OTP Method: Send Code
+   ============================================================ */
+async function sendOTP() {
+    clearError('otp-send-error');
+
+    const email = document.getElementById('otp-email').value.trim();
+    if (!validateEmail(email)) {
+        return showError('otp-send-error', 'Please enter a valid email address.');
+    }
+
+    const btn      = document.getElementById('otp-send-btn');
+    const textEl   = document.getElementById('otp-send-text');
+    btn.disabled   = true;
+    textEl.textContent = 'Sending...';
+
+    try {
+        const res  = await fetch(`${API_BASE}/send-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            showError('otp-send-error', data.error || 'Failed to send verification code. Please try again.');
+            btn.disabled = false;
+            textEl.textContent = 'Send Code';
+            return;
+        }
+
+        // Show step 2 (code input)
+        document.getElementById('otp-step-1').style.display = 'none';
+        document.getElementById('otp-step-2').style.display = 'block';
+        document.getElementById('otp-code').focus();
+
+        // Start 10-minute countdown
+        startOTPCountdown(600);
+
+    } catch {
+        showError('otp-send-error', 'Network error. Please check your connection and try again.');
+        btn.disabled = false;
+        textEl.textContent = 'Send Code';
+    }
+}
+
+/* ============================================================
+   Sign In — OTP Method: Verify Code
+   ============================================================ */
+async function handleOTPVerify(e) {
+    e.preventDefault();
+    clearError('otp-verify-error');
+
+    const email = document.getElementById('otp-email').value.trim();
+    const code  = document.getElementById('otp-code').value.trim();
+
+    if (!code || code.length !== 6) {
+        return showError('otp-verify-error', 'Please enter the 6-digit code from your email.');
+    }
+
+    setLoading('otp-verify-btn', true);
+
+    try {
+        const res  = await fetch(`${API_BASE}/verify-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            showError('otp-verify-error', data.error || 'Invalid or expired code. Please try again.');
+            setLoading('otp-verify-btn', false);
+            return;
+        }
+
+        // Stop countdown
+        if (otpCountdownTimer) clearInterval(otpCountdownTimer);
+
+        // Successful OTP login — redirect to homepage
+        window.location.href = 'http://43.130.98.104:8080/index.html';
+    } catch {
+        showError('otp-verify-error', 'Network error. Please check your connection and try again.');
+        setLoading('otp-verify-btn', false);
+    }
+}
+
+/* ============================================================
+   OTP Countdown Timer
+   ============================================================ */
+function startOTPCountdown(seconds) {
+    if (otpCountdownTimer) clearInterval(otpCountdownTimer);
+    const el = document.getElementById('otp-countdown');
+    let remaining = seconds;
+
+    function update() {
+        const m = Math.floor(remaining / 60);
+        const s = remaining % 60;
+        el.textContent = `Code expires in ${m}:${s.toString().padStart(2, '0')}`;
+        if (remaining <= 0) {
+            clearInterval(otpCountdownTimer);
+            el.textContent = 'Code expired. Please request a new one.';
+            el.style.color = '#FCA5A5';
+            // Reset back to step 1
+            setTimeout(resetOTP, 2000);
+        }
+        remaining--;
+    }
+
+    update();
+    otpCountdownTimer = setInterval(update, 1000);
+}
+
+/* ============================================================
+   Reset OTP flow back to step 1
+   ============================================================ */
+function resetOTP() {
+    if (otpCountdownTimer) clearInterval(otpCountdownTimer);
+    document.getElementById('otp-step-1').style.display = 'block';
+    document.getElementById('otp-step-2').style.display = 'none';
+    document.getElementById('otp-code').value = '';
+    document.getElementById('otp-countdown').textContent = '';
+    document.getElementById('otp-countdown').style.color = '';
+    const btn    = document.getElementById('otp-send-btn');
+    const textEl = document.getElementById('otp-send-text');
+    if (btn)    btn.disabled = false;
+    if (textEl) textEl.textContent = 'Send Code';
+    clearError('otp-send-error');
+    clearError('otp-verify-error');
 }
 
 /* ============================================================
@@ -201,7 +347,6 @@ async function handleSignUp(e) {
         }
 
         pendingEmail = email;
-        pendingRole  = 'player';
         document.getElementById('verify-email-display').textContent = email;
         hideTabs();
         showPanel('panel-verify');
@@ -226,7 +371,7 @@ async function resendVerification() {
         const res  = await fetch(`${API_BASE}/resend`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: pendingEmail, role: pendingRole })
+            body: JSON.stringify({ email: pendingEmail })
         });
         const data = await res.json();
 
@@ -249,23 +394,6 @@ async function resendVerification() {
         btn.disabled = false;
         btn.textContent = 'Resend Email';
     }, 30000);
-}
-
-/* ============================================================
-   Success Countdown
-   ============================================================ */
-function startCountdown() {
-    let count = 5;
-    const el = document.getElementById('countdown');
-    if (!el) return;
-    const timer = setInterval(() => {
-        count--;
-        el.textContent = count;
-        if (count <= 0) {
-            clearInterval(timer);
-            window.location.href = 'index.html';
-        }
-    }, 1000);
 }
 
 /* ============================================================

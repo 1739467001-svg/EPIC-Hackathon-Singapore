@@ -415,6 +415,88 @@ input, select { font-family: inherit; }
 }
 .auth-submit-ghost:hover { background: transparent; color: rgba(255,255,255,0.7); box-shadow: none; transform: none; }
 
+/* ============================================================
+   LOGIN METHOD SUB-TABS
+   ============================================================ */
+.signin-method-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 3px;
+    margin-bottom: 24px;
+    gap: 3px;
+}
+
+.signin-method-tab {
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.35);
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: -0.1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.signin-method-tab.active {
+    background: rgba(255,255,255,0.1);
+    color: #ffffff;
+    border: 1px solid rgba(255,255,255,0.12);
+}
+
+.signin-method-tab:hover:not(.active) {
+    color: rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.04);
+}
+
+.signin-method-panel { display: none; }
+.signin-method-panel.active { display: block; animation: fadeUp 0.25s ease both; }
+
+/* OTP input row */
+.otp-send-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.otp-send-btn {
+    padding: 14px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0a0a0a;
+    background: #22C55E;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s, opacity 0.2s;
+    flex-shrink: 0;
+}
+
+.otp-send-btn:hover { background: #16a34a; }
+.otp-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.otp-code-wrap {
+    margin-bottom: 12px;
+}
+
+.otp-countdown {
+    font-size: 12px;
+    color: rgba(255,255,255,0.35);
+    text-align: right;
+    margin-top: 4px;
+}
+
 /* Switch text */
 .auth-switch-text {
     text-align: center;
@@ -579,30 +661,77 @@ input, select { font-family: inherit; }
                 <h2 class="auth-panel-title">Welcome back</h2>
                 <p class="auth-panel-subtitle">Sign in to your EPIC account</p>
 
-                <form id="form-signin" novalidate>
-                    <div class="auth-field-wrap">
-                        <input type="email" id="si-email" class="auth-field" placeholder="you@example.com" autocomplete="email" required />
-                    </div>
-
-                    <div class="auth-field-wrap auth-field-password-wrap">
-                        <input type="password" id="si-password" class="auth-field" placeholder="Enter your password" autocomplete="current-password" required />
-                        <button type="button" class="auth-eye-btn" onclick="togglePassword('si-password', this)" aria-label="Show password">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                <circle cx="12" cy="12" r="3"/>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <a href="#" class="auth-forgot" onclick="showForgot(event)">Forgot password?</a>
-
-                    <div id="signin-error" class="auth-form-error hidden"></div>
-
-                    <button type="submit" class="auth-submit-btn" id="signin-submit-btn">
-                        <span class="btn-text">Sign In</span>
-                        <span class="btn-loading hidden">Signing in...</span>
+                <!-- Login method sub-tabs -->
+                <div class="signin-method-tabs">
+                    <button class="signin-method-tab active" data-method="password" onclick="switchSigninMethod('password')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        Password Login
                     </button>
-                </form>
+                    <button class="signin-method-tab" data-method="otp" onclick="switchSigninMethod('otp')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        Email OTP
+                    </button>
+                </div>
+
+                <!-- Method 1: Password login -->
+                <div class="signin-method-panel active" id="method-password">
+                    <form id="form-signin" novalidate>
+                        <div class="auth-field-wrap">
+                            <input type="email" id="si-email" class="auth-field" placeholder="you@example.com" autocomplete="email" required />
+                        </div>
+
+                        <div class="auth-field-wrap auth-field-password-wrap">
+                            <input type="password" id="si-password" class="auth-field" placeholder="Enter your password" autocomplete="current-password" required />
+                            <button type="button" class="auth-eye-btn" onclick="togglePassword('si-password', this)" aria-label="Show password">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <a href="#" class="auth-forgot" onclick="showForgot(event)">Forgot password?</a>
+
+                        <div id="signin-error" class="auth-form-error hidden"></div>
+
+                        <button type="submit" class="auth-submit-btn" id="signin-submit-btn">
+                            <span class="btn-text">Sign In</span>
+                            <span class="btn-loading hidden">Signing in...</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Method 2: OTP login -->
+                <div class="signin-method-panel" id="method-otp">
+                    <form id="form-otp" novalidate>
+                        <!-- Step 1: Enter email + send OTP -->
+                        <div id="otp-step-1">
+                            <div class="otp-send-row">
+                                <div class="auth-field-wrap" style="margin-bottom:0">
+                                    <input type="email" id="otp-email" class="auth-field" placeholder="you@example.com" autocomplete="email" required />
+                                </div>
+                                <button type="button" class="otp-send-btn" id="otp-send-btn" onclick="sendOTP()">
+                                    <span id="otp-send-text">Send Code</span>
+                                </button>
+                            </div>
+                            <div id="otp-send-error" class="auth-form-error hidden"></div>
+                        </div>
+
+                        <!-- Step 2: Enter OTP code -->
+                        <div id="otp-step-2" style="display:none">
+                            <div class="auth-field-wrap otp-code-wrap">
+                                <input type="text" id="otp-code" class="auth-field" placeholder="Enter 6-digit code" maxlength="6" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" />
+                                <div class="otp-countdown" id="otp-countdown"></div>
+                            </div>
+                            <div id="otp-verify-error" class="auth-form-error hidden"></div>
+                            <button type="submit" class="auth-submit-btn" id="otp-verify-btn">
+                                <span class="btn-text">Verify &amp; Sign In</span>
+                                <span class="btn-loading hidden">Verifying...</span>
+                            </button>
+                            <button type="button" class="auth-submit-btn auth-submit-ghost" onclick="resetOTP()">Use a different email</button>
+                        </div>
+                    </form>
+                </div>
 
                 <p class="auth-switch-text">
                     Don't have an account?
