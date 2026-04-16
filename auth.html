@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Register — EPIC Hackathon Singapore</title>
-    <meta name="description" content="Join EPIC Hackathon Singapore. Register as a Participant or Organizer." />
+    <title>Sign In — EPIC Hackathon Singapore</title>
+    <meta name="description" content="Sign in or create your EPIC Hackathon Singapore account." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -13,110 +13,137 @@
 </head>
 <body class="auth-body">
 
-<!-- Navigation -->
-<header class="header scrolled" id="header">
-    <div class="header-container">
-        <a href="index.html" class="header-logo">EPIC</a>
-        <nav class="header-nav">
-            <a href="index.html#about" class="nav-link">About</a>
-            <a href="index.html#schedule" class="nav-link">Schedule</a>
-            <a href="index.html#prizes" class="nav-link">Prizes</a>
-        </nav>
-        <div class="header-actions">
-            <a href="index.html" class="btn btn-secondary btn-small">Back to Home</a>
-        </div>
-    </div>
-</header>
+<div class="auth-layout">
 
-<main class="auth-main">
-    <div class="auth-bg">
-        <div class="grid-overlay"></div>
-        <div class="gradient-orb orb-1"></div>
-        <div class="gradient-orb orb-2"></div>
-    </div>
+    <!-- ===== LEFT PANEL ===== -->
+    <div class="auth-left">
+        <div class="auth-left-inner">
+            <!-- Back link -->
+            <a href="index.html" class="auth-back-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                Back to EPIC
+            </a>
 
-    <div class="auth-container">
-
-        <!-- STEP 0: Role Selection -->
-        <div id="step-role" class="auth-step active">
-            <div class="auth-badge">
-                <span class="badge-pulse"></span>
-                Registration Open
-            </div>
-            <h1 class="auth-heading">Create Your Account</h1>
-            <p class="auth-subheading">Choose how you're joining EPIC Hackathon</p>
-
-            <div class="role-grid">
-                <button class="role-card" id="role-player" onclick="selectRole('player')">
-                    <div class="role-icon-wrap">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
-                    </div>
-                    <div class="role-info">
-                        <div class="role-name">Participant</div>
-                        <div class="role-desc">Compete, build projects, and win prizes as an individual or team member</div>
-                    </div>
-                    <svg class="role-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                </button>
-
-                <button class="role-card" id="role-admin" onclick="selectRole('admin')">
-                    <div class="role-icon-wrap">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    </div>
-                    <div class="role-info">
-                        <div class="role-name">Organizer</div>
-                        <div class="role-desc">Create and manage hackathon events, challenges, and activities</div>
-                    </div>
-                    <svg class="role-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                </button>
+            <!-- Brand -->
+            <div class="auth-left-brand">
+                <div class="auth-left-logo">EPIC</div>
+                <h1 class="auth-left-headline">
+                    Build the future<br>
+                    <span class="auth-left-accent">in 48 hours.</span>
+                </h1>
+                <p class="auth-left-desc">
+                    Join 200+ global founders, developers, and designers at Singapore's premier AI hackathon.
+                </p>
             </div>
 
-            <p class="auth-footer-text">Already registered? <a href="#" class="auth-link">Sign in here</a></p>
+            <!-- Stats card -->
+            <div class="auth-stats-card">
+                <div class="auth-stat">
+                    <div class="auth-stat-value">$100K</div>
+                    <div class="auth-stat-label">PRIZE<br>POOL</div>
+                </div>
+                <div class="auth-stat-divider"></div>
+                <div class="auth-stat">
+                    <div class="auth-stat-value">200+</div>
+                    <div class="auth-stat-label">FOUNDERS</div>
+                </div>
+                <div class="auth-stat-divider"></div>
+                <div class="auth-stat">
+                    <div class="auth-stat-value">June<br>15</div>
+                    <div class="auth-stat-label">SINGAPORE</div>
+                </div>
+            </div>
         </div>
 
-        <!-- STEP 1A: Participant Form -->
-        <div id="step-player" class="auth-step">
-            <button class="back-btn" onclick="goBack('step-role')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                Back
-            </button>
-            <div class="auth-badge">
-                <span class="badge-pulse"></span>
-                Participant Registration
-            </div>
-            <h1 class="auth-heading">Join as a Participant</h1>
-            <p class="auth-subheading">Tell us about yourself and your skills</p>
+        <!-- Grid overlay -->
+        <div class="auth-left-grid"></div>
+        <!-- Green glow -->
+        <div class="auth-left-glow"></div>
+    </div>
 
-            <form id="form-player" novalidate>
-                <div class="form-section">
-                    <div class="form-section-title">Basic Information</div>
-                    <div class="form-row-2">
-                        <div class="field-wrap">
-                            <label class="field-label">First Name <span class="req">*</span></label>
-                            <input type="text" id="p-firstname" class="field-input" placeholder="John" required />
+    <!-- ===== RIGHT PANEL ===== -->
+    <div class="auth-right">
+        <div class="auth-right-inner">
+
+            <!-- Tab switcher -->
+            <div class="auth-tabs" id="authTabs">
+                <button class="auth-tab active" data-tab="signin" onclick="switchTab('signin')">Sign In</button>
+                <button class="auth-tab" data-tab="signup" onclick="switchTab('signup')">Create Account</button>
+            </div>
+
+            <!-- ===== SIGN IN PANEL ===== -->
+            <div class="auth-panel active" id="panel-signin">
+                <div class="auth-panel-header">
+                    <h2 class="auth-panel-title">Welcome back</h2>
+                    <p class="auth-panel-subtitle">Sign in to your EPIC account</p>
+                </div>
+
+                <form id="form-signin" novalidate>
+                    <div class="auth-field-wrap">
+                        <input type="email" id="si-email" class="auth-field" placeholder="you@example.com" autocomplete="email" required />
+                    </div>
+
+                    <div class="auth-field-wrap auth-field-password-wrap">
+                        <input type="password" id="si-password" class="auth-field" placeholder="Enter your password" autocomplete="current-password" required />
+                        <button type="button" class="auth-eye-btn" onclick="togglePassword('si-password', this)" aria-label="Show password">
+                            <svg class="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </button>
+                        <a href="#" class="auth-forgot" onclick="showForgot(event)">Forgot password?</a>
+                    </div>
+
+                    <div id="signin-error" class="auth-form-error hidden"></div>
+
+                    <button type="submit" class="auth-submit-btn" id="signin-submit-btn">
+                        <span class="btn-text">Sign In</span>
+                        <span class="btn-loading hidden">Signing in...</span>
+                    </button>
+                </form>
+
+                <p class="auth-switch-text">
+                    Don't have an account?
+                    <button class="auth-switch-link" onclick="switchTab('signup')">Create one</button>
+                </p>
+            </div>
+
+            <!-- ===== CREATE ACCOUNT PANEL ===== -->
+            <div class="auth-panel" id="panel-signup">
+                <div class="auth-panel-header">
+                    <h2 class="auth-panel-title">Create account</h2>
+                    <p class="auth-panel-subtitle">Join EPIC Hackathon Singapore</p>
+                </div>
+
+                <form id="form-signup" novalidate>
+                    <div class="auth-field-row">
+                        <div class="auth-field-wrap">
+                            <input type="text" id="su-firstname" class="auth-field" placeholder="First name" autocomplete="given-name" required />
                         </div>
-                        <div class="field-wrap">
-                            <label class="field-label">Last Name <span class="req">*</span></label>
-                            <input type="text" id="p-lastname" class="field-input" placeholder="Doe" required />
+                        <div class="auth-field-wrap">
+                            <input type="text" id="su-lastname" class="auth-field" placeholder="Last name" autocomplete="family-name" required />
                         </div>
                     </div>
-                    <div class="field-wrap">
-                        <label class="field-label">Email Address <span class="req">*</span></label>
-                        <input type="email" id="p-email" class="field-input" placeholder="john@example.com" required />
+
+                    <div class="auth-field-wrap">
+                        <input type="email" id="su-email" class="auth-field" placeholder="you@example.com" autocomplete="email" required />
                     </div>
-                    <div class="form-row-2">
-                        <div class="field-wrap">
-                            <label class="field-label">Password <span class="req">*</span></label>
-                            <input type="password" id="p-password" class="field-input" placeholder="Min. 8 characters" required minlength="8" />
-                        </div>
-                        <div class="field-wrap">
-                            <label class="field-label">Confirm Password <span class="req">*</span></label>
-                            <input type="password" id="p-password2" class="field-input" placeholder="Repeat password" required />
-                        </div>
+
+                    <div class="auth-field-wrap auth-field-password-wrap">
+                        <input type="password" id="su-password" class="auth-field" placeholder="Create a password (min. 8 chars)" autocomplete="new-password" required minlength="8" />
+                        <button type="button" class="auth-eye-btn" onclick="togglePassword('su-password', this)" aria-label="Show password">
+                            <svg class="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </button>
                     </div>
-                    <div class="field-wrap">
-                        <label class="field-label">Primary Role</label>
-                        <select id="p-role" class="field-input field-select">
-                            <option value="">Select your primary role</option>
+
+                    <div class="auth-field-wrap">
+                        <select id="su-role" class="auth-field auth-field-select" required>
+                            <option value="">Select your role</option>
                             <option value="software-engineer">Software Engineer</option>
                             <option value="frontend">Frontend Developer</option>
                             <option value="backend">Backend Developer</option>
@@ -129,233 +156,54 @@
                             <option value="other">Other</option>
                         </select>
                     </div>
-                    <div class="field-wrap">
-                        <label class="field-label">Bio <span class="opt">(optional)</span></label>
-                        <textarea id="p-bio" class="field-input field-textarea" placeholder="Tell us about yourself, your background, and what you're excited to build..." rows="3"></textarea>
-                    </div>
-                </div>
 
-                <div class="form-section">
-                    <div class="form-section-title">Portfolio Links <span class="opt">(optional)</span></div>
-                    <div class="field-wrap">
-                        <label class="field-label">GitHub</label>
-                        <div class="field-prefix-wrap">
-                            <span class="field-prefix">github.com/</span>
-                            <input type="text" id="p-github" class="field-input field-prefixed" placeholder="yourusername" />
-                        </div>
-                    </div>
-                    <div class="field-wrap">
-                        <label class="field-label">LinkedIn</label>
-                        <div class="field-prefix-wrap">
-                            <span class="field-prefix">linkedin.com/in/</span>
-                            <input type="text" id="p-linkedin" class="field-input field-prefixed" placeholder="yourprofile" />
-                        </div>
-                    </div>
-                    <div class="field-wrap">
-                        <label class="field-label">Discord</label>
-                        <input type="text" id="p-discord" class="field-input" placeholder="username or @handle" />
-                    </div>
-                    <div class="field-wrap">
-                        <label class="field-label">Personal Website</label>
-                        <input type="url" id="p-website" class="field-input" placeholder="https://yoursite.com" />
-                    </div>
-                    <div class="field-wrap">
-                        <label class="field-label">Skills</label>
-                        <input type="text" id="p-skills" class="field-input" placeholder="e.g. React, Python, AWS, Figma..." />
-                        <span class="field-hint">Separate with commas</span>
-                    </div>
-                </div>
+                    <div id="signup-error" class="auth-form-error hidden"></div>
 
-                <div class="form-section">
-                    <div class="form-section-title">Team Status</div>
-                    <div class="radio-stack">
-                        <label class="radio-row">
-                            <input type="radio" name="p-team" value="looking" />
-                            <span class="radio-dot"></span>
-                            <span class="radio-body">
-                                <strong>Looking for a team</strong>
-                                <span>I want to be matched with other participants</span>
-                            </span>
-                        </label>
-                        <label class="radio-row">
-                            <input type="radio" name="p-team" value="have-team" />
-                            <span class="radio-dot"></span>
-                            <span class="radio-body">
-                                <strong>I already have a team</strong>
-                                <span>I'm joining with my own group</span>
-                            </span>
-                        </label>
-                        <label class="radio-row">
-                            <input type="radio" name="p-team" value="solo" checked />
-                            <span class="radio-dot"></span>
-                            <span class="radio-body">
-                                <strong>Participating solo</strong>
-                                <span>I'll compete on my own</span>
-                            </span>
-                        </label>
-                    </div>
-                </div>
+                    <button type="submit" class="auth-submit-btn" id="signup-submit-btn">
+                        <span class="btn-text">Create Account</span>
+                        <span class="btn-loading hidden">Creating account...</span>
+                    </button>
+                </form>
 
-                <div id="player-error" class="form-error hidden"></div>
-                <button type="submit" class="btn btn-primary btn-full btn-submit" id="player-submit-btn">
-                    <span class="btn-text">Send Verification Email &rarr;</span>
-                    <span class="btn-loading hidden">Sending...</span>
-                </button>
-            </form>
-        </div>
-
-        <!-- STEP 1B: Organizer Form -->
-        <div id="step-admin" class="auth-step">
-            <button class="back-btn" onclick="goBack('step-role')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                Back
-            </button>
-            <div class="auth-badge">
-                <span class="badge-pulse"></span>
-                Organizer Registration
+                <p class="auth-switch-text">
+                    Already have an account?
+                    <button class="auth-switch-link" onclick="switchTab('signin')">Sign in</button>
+                </p>
             </div>
-            <h1 class="auth-heading">Join as an Organizer</h1>
-            <p class="auth-subheading">Set up your organizer account and create your first event</p>
 
-            <form id="form-admin" novalidate>
-                <div class="form-section">
-                    <div class="form-section-title">Account Information</div>
-                    <div class="form-row-2">
-                        <div class="field-wrap">
-                            <label class="field-label">First Name <span class="req">*</span></label>
-                            <input type="text" id="a-firstname" class="field-input" placeholder="Jane" required />
-                        </div>
-                        <div class="field-wrap">
-                            <label class="field-label">Last Name <span class="req">*</span></label>
-                            <input type="text" id="a-lastname" class="field-input" placeholder="Smith" required />
-                        </div>
-                    </div>
-                    <div class="field-wrap">
-                        <label class="field-label">Email Address <span class="req">*</span></label>
-                        <input type="email" id="a-email" class="field-input" placeholder="jane@organization.com" required />
-                    </div>
-                    <div class="form-row-2">
-                        <div class="field-wrap">
-                            <label class="field-label">Password <span class="req">*</span></label>
-                            <input type="password" id="a-password" class="field-input" placeholder="Min. 8 characters" required minlength="8" />
-                        </div>
-                        <div class="field-wrap">
-                            <label class="field-label">Confirm Password <span class="req">*</span></label>
-                            <input type="password" id="a-password2" class="field-input" placeholder="Repeat password" required />
-                        </div>
-                    </div>
-                    <div class="field-wrap">
-                        <label class="field-label">Organization <span class="req">*</span></label>
-                        <input type="text" id="a-org" class="field-input" placeholder="Your company or organization name" required />
-                    </div>
-                    <div class="field-wrap">
-                        <label class="field-label">Your Role</label>
-                        <select id="a-role" class="field-input field-select">
-                            <option value="">Select your role</option>
-                            <option value="organizer">Event Organizer</option>
-                            <option value="sponsor">Sponsor Representative</option>
-                            <option value="mentor">Mentor / Judge</option>
-                            <option value="community">Community Manager</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
+            <!-- ===== EMAIL SENT PANEL ===== -->
+            <div class="auth-panel" id="panel-verify">
+                <div class="auth-verify-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                        <polyline points="22,6 12,13 2,6"/>
+                    </svg>
                 </div>
+                <h2 class="auth-panel-title" style="text-align:center">Check your email</h2>
+                <p class="auth-panel-subtitle" style="text-align:center">We've sent a verification link to</p>
+                <div class="auth-email-chip" id="verify-email-display"></div>
+                <p class="auth-verify-note">Click the link in the email to complete your registration. The link expires in 24 hours.</p>
+                <button class="auth-submit-btn auth-submit-outline" id="resend-btn" onclick="resendVerification()">Resend Email</button>
+                <a href="index.html" class="auth-submit-btn auth-submit-ghost" style="margin-top:10px;display:block;text-align:center;text-decoration:none;">Back to Home</a>
+                <div id="resend-message" class="auth-form-error hidden" style="text-align:center;margin-top:12px;"></div>
+            </div>
 
-                <div class="form-section">
-                    <div class="form-section-title">
-                        Event Details
-                        <span class="opt"> — optional, you can add events after registration</span>
-                    </div>
-                    <div class="field-wrap">
-                        <label class="field-label">Event Name</label>
-                        <input type="text" id="a-event-name" class="field-input" placeholder="e.g. EPIC Hackathon Singapore 2025" />
-                    </div>
-                    <div class="form-row-2">
-                        <div class="field-wrap">
-                            <label class="field-label">Start Date &amp; Time</label>
-                            <input type="datetime-local" id="a-event-start" class="field-input" />
-                        </div>
-                        <div class="field-wrap">
-                            <label class="field-label">End Date &amp; Time</label>
-                            <input type="datetime-local" id="a-event-end" class="field-input" />
-                        </div>
-                    </div>
-                    <div class="field-wrap">
-                        <label class="field-label">Location</label>
-                        <input type="text" id="a-event-location" class="field-input" placeholder="Venue address or online link" />
-                    </div>
-                    <div class="field-wrap">
-                        <label class="field-label">Event Description</label>
-                        <textarea id="a-event-desc" class="field-input field-textarea" placeholder="Describe your event, goals, and what participants can expect..." rows="3"></textarea>
-                    </div>
-                    <div class="form-row-2">
-                        <div class="field-wrap">
-                            <label class="field-label">Ticket Price</label>
-                            <select id="a-event-price" class="field-input field-select">
-                                <option value="free">Free</option>
-                                <option value="paid">Paid</option>
-                            </select>
-                        </div>
-                        <div class="field-wrap">
-                            <label class="field-label">Capacity</label>
-                            <select id="a-event-capacity" class="field-input field-select">
-                                <option value="unlimited">Unlimited</option>
-                                <option value="50">Up to 50</option>
-                                <option value="100">Up to 100</option>
-                                <option value="200">Up to 200</option>
-                                <option value="500">Up to 500</option>
-                                <option value="1000">Up to 1,000</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="field-wrap">
-                        <label class="toggle-wrap">
-                            <div class="toggle-switch">
-                                <input type="checkbox" id="a-event-approval" />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            </div>
-                            <span class="toggle-label">Participants need approval to join</span>
-                        </label>
-                    </div>
+            <!-- ===== SUCCESS PANEL ===== -->
+            <div class="auth-panel" id="panel-success">
+                <div class="auth-success-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
                 </div>
-
-                <div id="admin-error" class="form-error hidden"></div>
-                <button type="submit" class="btn btn-primary btn-full btn-submit" id="admin-submit-btn">
-                    <span class="btn-text">Send Verification Email &rarr;</span>
-                    <span class="btn-loading hidden">Sending...</span>
-                </button>
-            </form>
-        </div>
-
-        <!-- STEP 2: Email Sent -->
-        <div id="step-verify" class="auth-step">
-            <div class="status-icon-wrap">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <h2 class="auth-panel-title" style="text-align:center">You're in!</h2>
+                <p class="auth-panel-subtitle" style="text-align:center">Your account has been verified. Redirecting in <span id="countdown">5</span>s...</p>
+                <a href="index.html" class="auth-submit-btn" style="margin-top:2rem;display:block;text-align:center;text-decoration:none;">Go to Homepage →</a>
             </div>
-            <h1 class="auth-heading">Check Your Email</h1>
-            <p class="auth-subheading">We've sent a verification link to</p>
-            <div class="verify-email-chip" id="verify-email-display"></div>
-            <p class="verify-note">Click the link in the email to complete your registration.<br/>The link expires in 24 hours.</p>
-            <div class="verify-actions">
-                <button class="btn btn-secondary btn-full" id="resend-btn" onclick="resendVerification()">Resend Email</button>
-                <a href="index.html" class="btn btn-secondary btn-full">Back to Home</a>
-            </div>
-            <div id="resend-message" class="form-error hidden" style="text-align:center;margin-top:12px;"></div>
-        </div>
 
-        <!-- STEP 3: Success -->
-        <div id="step-success" class="auth-step">
-            <div class="status-icon-wrap success">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            </div>
-            <h1 class="auth-heading">Registration Complete!</h1>
-            <p class="auth-subheading">Your account has been verified and your information has been saved.</p>
-            <p class="verify-note">Redirecting to homepage in <span id="countdown">5</span> seconds...</p>
-            <a href="index.html" class="btn btn-primary btn-full" style="margin-top:2rem">Go to Homepage &rarr;</a>
         </div>
-
     </div>
-</main>
+
+</div>
 
 <script src="auth.js"></script>
 </body>

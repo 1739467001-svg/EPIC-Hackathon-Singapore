@@ -1,12 +1,12 @@
 /**
- * EPIC Hackathon Singapore — Registration Logic
- * auth.js  (v2 — multi-step, role-based, email verification)
+ * EPIC Hackathon Singapore — Auth Logic
+ * auth.js  (v3 — split layout, email-only sign in / create account)
  */
 
 const API_BASE = 'http://43.130.98.104:8080/api';
 
-let currentRole = null;
 let pendingEmail = null;
+let pendingRole  = 'player';
 
 /* ============================================================
    Page Init
@@ -16,7 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Coming back from email verification link
     if (params.get('verified') === '1') {
-        showStep('step-success');
+        showPanel('panel-success');
+        hideTabs();
         startCountdown();
         return;
     }
@@ -24,7 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Error from verification
     const err = params.get('error');
     if (err) {
-        showStep('step-role');
         const msg = err === 'token_expired'
             ? 'Your verification link has expired. Please register again.'
             : err === 'invalid_token'
@@ -34,29 +34,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Form submit listeners
-    const fp = document.getElementById('form-player');
-    const fa = document.getElementById('form-admin');
-    if (fp) fp.addEventListener('submit', handlePlayerSubmit);
-    if (fa) fa.addEventListener('submit', handleAdminSubmit);
+    const fsi = document.getElementById('form-signin');
+    const fsu = document.getElementById('form-signup');
+    if (fsi) fsi.addEventListener('submit', handleSignIn);
+    if (fsu) fsu.addEventListener('submit', handleSignUp);
 });
 
 /* ============================================================
-   Step Navigation
+   Tab / Panel Navigation
    ============================================================ */
-function showStep(stepId) {
-    document.querySelectorAll('.auth-step').forEach(s => s.classList.remove('active'));
-    const el = document.getElementById(stepId);
+function switchTab(tab) {
+    // Update tab buttons
+    document.querySelectorAll('.auth-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+
+    // Show correct panel
+    const panelId = tab === 'signin' ? 'panel-signin' : 'panel-signup';
+    showPanel(panelId);
+}
+
+function showPanel(panelId) {
+    document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
+    const el = document.getElementById(panelId);
     if (el) el.classList.add('active');
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function selectRole(role) {
-    currentRole = role;
-    showStep(role === 'player' ? 'step-player' : 'step-admin');
+function hideTabs() {
+    const tabs = document.getElementById('authTabs');
+    if (tabs) tabs.style.display = 'none';
 }
 
-function goBack(targetStep) {
-    showStep(targetStep);
+/* ============================================================
+   Password Toggle
+   ============================================================ */
+function togglePassword(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const isHidden = input.type === 'password';
+    input.type = isHidden ? 'text' : 'password';
+
+    // Swap icon
+    const icon = btn.querySelector('.eye-icon');
+    if (icon) {
+        icon.innerHTML = isHidden
+            ? `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`
+            : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+    }
+}
+
+/* ============================================================
+   Forgot Password
+   ============================================================ */
+function showForgot(e) {
+    e.preventDefault();
+    showToast('Password reset is coming soon. Please contact support.', 'info');
 }
 
 /* ============================================================
@@ -71,7 +104,6 @@ function showError(elementId, msg) {
     if (!el) return;
     el.textContent = msg;
     el.classList.remove('hidden');
-    el.classList.add('error');
 }
 
 function clearError(elementId) {
@@ -84,130 +116,97 @@ function clearError(elementId) {
 function setLoading(btnId, loading) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
-    if (loading) {
-        btn.classList.add('loading');
-        btn.disabled = true;
-    } else {
-        btn.classList.remove('loading');
-        btn.disabled = false;
+    const textEl    = btn.querySelector('.btn-text');
+    const loadingEl = btn.querySelector('.btn-loading');
+    btn.disabled = loading;
+    if (textEl)    textEl.classList.toggle('hidden', loading);
+    if (loadingEl) loadingEl.classList.toggle('hidden', !loading);
+}
+
+/* ============================================================
+   Sign In
+   ============================================================ */
+async function handleSignIn(e) {
+    e.preventDefault();
+    clearError('signin-error');
+
+    const email    = document.getElementById('si-email').value.trim();
+    const password = document.getElementById('si-password').value;
+
+    if (!validateEmail(email)) return showError('signin-error', 'Please enter a valid email address.');
+    if (!password)             return showError('signin-error', 'Please enter your password.');
+
+    setLoading('signin-submit-btn', true);
+
+    try {
+        const res  = await fetch(`${API_BASE}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            showError('signin-error', data.error || 'Invalid email or password. Please try again.');
+            setLoading('signin-submit-btn', false);
+            return;
+        }
+
+        // Successful login — redirect to homepage
+        window.location.href = 'index.html';
+    } catch {
+        showError('signin-error', 'Network error. Please check your connection and try again.');
+        setLoading('signin-submit-btn', false);
     }
 }
 
 /* ============================================================
-   Participant Form Submit
+   Create Account (Sign Up)
    ============================================================ */
-async function handlePlayerSubmit(e) {
+async function handleSignUp(e) {
     e.preventDefault();
-    clearError('player-error');
+    clearError('signup-error');
 
-    const firstName  = document.getElementById('p-firstname').value.trim();
-    const lastName   = document.getElementById('p-lastname').value.trim();
-    const email      = document.getElementById('p-email').value.trim();
-    const password   = document.getElementById('p-password').value;
-    const password2  = document.getElementById('p-password2').value;
-    const title      = document.getElementById('p-role').value;
-    const bio        = document.getElementById('p-bio').value.trim();
-    const github     = document.getElementById('p-github').value.trim();
-    const linkedin   = document.getElementById('p-linkedin').value.trim();
-    const discord    = document.getElementById('p-discord').value.trim();
-    const website    = document.getElementById('p-website').value.trim();
-    const skills     = document.getElementById('p-skills').value.trim();
-    const teamStatus = document.querySelector('input[name="p-team"]:checked')?.value || 'solo';
+    const firstName = document.getElementById('su-firstname').value.trim();
+    const lastName  = document.getElementById('su-lastname').value.trim();
+    const email     = document.getElementById('su-email').value.trim();
+    const password  = document.getElementById('su-password').value;
+    const title     = document.getElementById('su-role').value;
 
-    if (!firstName || !lastName) return showError('player-error', 'Please enter your full name.');
-    if (!validateEmail(email))   return showError('player-error', 'Please enter a valid email address.');
-    if (password.length < 8)     return showError('player-error', 'Password must be at least 8 characters.');
-    if (password !== password2)  return showError('player-error', 'Passwords do not match.');
-    if (!title)                  return showError('player-error', 'Please select your role / title.');
+    if (!firstName || !lastName) return showError('signup-error', 'Please enter your full name.');
+    if (!validateEmail(email))   return showError('signup-error', 'Please enter a valid email address.');
+    if (password.length < 8)     return showError('signup-error', 'Password must be at least 8 characters.');
+    if (!title)                  return showError('signup-error', 'Please select your role.');
 
-    setLoading('player-submit-btn', true);
+    setLoading('signup-submit-btn', true);
 
     try {
-        const res = await fetch(`${API_BASE}/register`, {
+        const res  = await fetch(`${API_BASE}/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 role: 'player',
                 email, password,
-                firstName, lastName, title, bio,
-                github, linkedin, discord, website, skills, teamStatus
+                firstName, lastName, title,
+                teamStatus: 'solo'
             })
         });
         const data = await res.json();
 
         if (!res.ok) {
-            showError('player-error', data.error || 'Registration failed. Please try again.');
-            setLoading('player-submit-btn', false);
+            showError('signup-error', data.error || 'Registration failed. Please try again.');
+            setLoading('signup-submit-btn', false);
             return;
         }
 
         pendingEmail = email;
+        pendingRole  = 'player';
         document.getElementById('verify-email-display').textContent = email;
-        showStep('step-verify');
-    } catch (err) {
-        showError('player-error', 'Network error. Please check your connection and try again.');
-        setLoading('player-submit-btn', false);
-    }
-}
-
-/* ============================================================
-   Organizer Form Submit
-   ============================================================ */
-async function handleAdminSubmit(e) {
-    e.preventDefault();
-    clearError('admin-error');
-
-    const firstName      = document.getElementById('a-firstname').value.trim();
-    const lastName       = document.getElementById('a-lastname').value.trim();
-    const email          = document.getElementById('a-email').value.trim();
-    const password       = document.getElementById('a-password').value;
-    const password2      = document.getElementById('a-password2').value;
-    const organization   = document.getElementById('a-org').value.trim();
-    const adminRole      = document.getElementById('a-role').value;
-    const eventName      = document.getElementById('a-event-name').value.trim();
-    const eventStart     = document.getElementById('a-event-start').value;
-    const eventEnd       = document.getElementById('a-event-end').value;
-    const eventLocation  = document.getElementById('a-event-location').value.trim();
-    const eventDesc      = document.getElementById('a-event-desc').value.trim();
-    const eventPrice     = document.getElementById('a-event-price').value;
-    const eventCapacity  = document.getElementById('a-event-capacity').value;
-    const eventApproval  = document.getElementById('a-event-approval').checked;
-
-    if (!firstName || !lastName) return showError('admin-error', 'Please enter your full name.');
-    if (!validateEmail(email))   return showError('admin-error', 'Please enter a valid email address.');
-    if (password.length < 8)     return showError('admin-error', 'Password must be at least 8 characters.');
-    if (password !== password2)  return showError('admin-error', 'Passwords do not match.');
-    if (!organization)           return showError('admin-error', 'Please enter your organization name.');
-    if (!adminRole)              return showError('admin-error', 'Please select your role.');
-
-    setLoading('admin-submit-btn', true);
-
-    try {
-        const res = await fetch(`${API_BASE}/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                role: 'admin',
-                email, password,
-                firstName, lastName, organization, adminRole,
-                eventName, eventStart, eventEnd, eventLocation,
-                eventDesc, eventPrice, eventCapacity, eventApproval
-            })
-        });
-        const data = await res.json();
-
-        if (!res.ok) {
-            showError('admin-error', data.error || 'Registration failed. Please try again.');
-            setLoading('admin-submit-btn', false);
-            return;
-        }
-
-        pendingEmail = email;
-        document.getElementById('verify-email-display').textContent = email;
-        showStep('step-verify');
-    } catch (err) {
-        showError('admin-error', 'Network error. Please check your connection and try again.');
-        setLoading('admin-submit-btn', false);
+        hideTabs();
+        showPanel('panel-verify');
+    } catch {
+        showError('signup-error', 'Network error. Please check your connection and try again.');
+        setLoading('signup-submit-btn', false);
     }
 }
 
@@ -215,7 +214,7 @@ async function handleAdminSubmit(e) {
    Resend Verification
    ============================================================ */
 async function resendVerification() {
-    const btn = document.getElementById('resend-btn');
+    const btn   = document.getElementById('resend-btn');
     const msgEl = document.getElementById('resend-message');
 
     btn.disabled = true;
@@ -223,25 +222,25 @@ async function resendVerification() {
     msgEl.classList.add('hidden');
 
     try {
-        const res = await fetch(`${API_BASE}/resend`, {
+        const res  = await fetch(`${API_BASE}/resend`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: pendingEmail, role: currentRole })
+            body: JSON.stringify({ email: pendingEmail, role: pendingRole })
         });
         const data = await res.json();
 
         if (res.ok) {
             msgEl.textContent = 'Verification email resent! Please check your inbox.';
-            msgEl.className = 'form-message success';
+            msgEl.style.background = 'rgba(34,197,94,0.08)';
+            msgEl.style.borderColor = 'rgba(34,197,94,0.22)';
+            msgEl.style.color = '#86efac';
             msgEl.classList.remove('hidden');
         } else {
             msgEl.textContent = data.error || 'Failed to resend. Please try again.';
-            msgEl.className = 'form-message error';
             msgEl.classList.remove('hidden');
         }
     } catch {
         msgEl.textContent = 'Network error. Please try again.';
-        msgEl.className = 'form-message error';
         msgEl.classList.remove('hidden');
     }
 
@@ -271,15 +270,17 @@ function startCountdown() {
 /* ============================================================
    Toast Notification
    ============================================================ */
-function showToast(msg, type) {
+function showToast(msg, type = 'error') {
+    const colors = {
+        error: 'background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.25);color:#ff9999;',
+        info:  'background:rgba(34,197,94,0.10);border:1px solid rgba(34,197,94,0.25);color:#86efac;'
+    };
     const toast = document.createElement('div');
     toast.style.cssText = [
-        'position:fixed;top:80px;right:20px;z-index:9999;',
-        'padding:12px 18px;border-radius:10px;font-size:14px;',
-        'max-width:340px;line-height:1.5;',
-        type === 'error'
-            ? 'background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.3);color:#ff8888;'
-            : 'background:rgba(80,200,120,0.15);border:1px solid rgba(80,200,120,0.3);color:#88d4a8;'
+        'position:fixed;top:24px;right:24px;z-index:9999;',
+        'padding:13px 18px;border-radius:12px;font-size:14px;',
+        'max-width:360px;line-height:1.5;font-family:Inter,sans-serif;',
+        colors[type] || colors.error
     ].join('');
     toast.textContent = msg;
     document.body.appendChild(toast);
