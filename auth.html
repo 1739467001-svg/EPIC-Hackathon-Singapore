@@ -1,321 +1,302 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In — EPIC Hackathon Singapore</title>
-    <meta name="description" content="Sign in or create your account for EPIC Hackathon Singapore 2026.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="auth.css">
-    <!-- Supabase JS SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register — EPIC Hackathon Singapore</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="auth.css" />
 </head>
 <body class="auth-page">
-
-    <!-- Auth Page -->
-    <div class="auth-wrapper">
-
-        <!-- Left Panel — Branding -->
-        <div class="auth-left">
-            <div class="auth-left-content">
-                <a href="/" class="auth-back-link">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M19 12H5M12 5l-7 7 7 7"/>
-                    </svg>
-                    Back to EPIC
-                </a>
-                <div class="auth-brand">
-                    <div class="auth-logo">EPIC</div>
-                    <h1 class="auth-headline">Build the future<br><span class="auth-headline-accent">in 48 hours.</span></h1>
-                    <p class="auth-subline">Join 200+ global founders, developers, and designers at Singapore's premier AI hackathon.</p>
+<header class="header" id="header">
+    <div class="header-container">
+        <a href="index.html" class="header-logo">EPIC</a>
+        <nav class="header-nav">
+            <a href="index.html#about" class="nav-link">About</a>
+            <a href="index.html#schedule" class="nav-link">Schedule</a>
+            <a href="index.html#prizes" class="nav-link">Prizes</a>
+        </nav>
+        <div class="header-actions">
+            <a href="index.html" class="btn btn-ghost">Back to Home</a>
+        </div>
+    </div>
+</header>
+<main class="auth-main">
+    <div class="auth-container">
+        <!-- LEFT: Branding -->
+        <div class="auth-branding">
+            <div class="auth-branding-inner">
+                <div class="auth-badge">EPIC 2025</div>
+                <h1 class="auth-headline">Join the<br/>Hackathon</h1>
+                <p class="auth-subline">Singapore's premier innovation challenge. Build, compete, and connect with the brightest minds in tech.</p>
+                <ul class="auth-features">
+                    <li><span class="feat-icon">&#9670;</span> $50,000+ in prizes</li>
+                    <li><span class="feat-icon">&#9670;</span> 48-hour build sprint</li>
+                    <li><span class="feat-icon">&#9670;</span> Top-tier mentors &amp; judges</li>
+                    <li><span class="feat-icon">&#9670;</span> Networking with 500+ builders</li>
+                </ul>
+                <div class="auth-date-badge">
+                    <span class="date-label">Event Date</span>
+                    <span class="date-value">August 2025 &middot; Singapore</span>
                 </div>
-                <div class="auth-left-stats">
-                    <div class="auth-stat">
-                        <span class="auth-stat-value">$100K</span>
-                        <span class="auth-stat-label">Prize Pool</span>
-                    </div>
-                    <div class="auth-stat-divider"></div>
-                    <div class="auth-stat">
-                        <span class="auth-stat-value">200+</span>
-                        <span class="auth-stat-label">Founders</span>
-                    </div>
-                    <div class="auth-stat-divider"></div>
-                    <div class="auth-stat">
-                        <span class="auth-stat-value">June 15</span>
-                        <span class="auth-stat-label">Singapore</span>
-                    </div>
-                </div>
-            </div>
-            <div class="auth-left-bg">
-                <div class="auth-orb auth-orb-1"></div>
-                <div class="auth-orb auth-orb-2"></div>
-                <div class="auth-grid"></div>
             </div>
         </div>
+        <!-- RIGHT: Form Steps -->
+        <div class="auth-form-panel">
+            <div class="auth-form-inner">
 
-        <!-- Right Panel — Auth Form -->
-        <div class="auth-right">
-            <div class="auth-form-container">
-
-                <!-- Tab Switcher -->
-                <div class="auth-tabs">
-                    <button class="auth-tab active" id="tab-signin" onclick="switchTab('signin')">Sign In</button>
-                    <button class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Create Account</button>
+                <!-- STEP 0: Role Selection -->
+                <div id="step-role" class="auth-step active">
+                    <h2 class="form-title">Create Your Account</h2>
+                    <p class="form-subtitle">Choose how you're joining EPIC Hackathon</p>
+                    <div class="role-cards">
+                        <button class="role-card" id="role-player" onclick="selectRole('player')">
+                            <div class="role-icon">&#127942;</div>
+                            <div class="role-name">Participant</div>
+                            <div class="role-desc">Compete, build projects, and win prizes as an individual or team member</div>
+                        </button>
+                        <button class="role-card" id="role-admin" onclick="selectRole('admin')">
+                            <div class="role-icon">&#127919;</div>
+                            <div class="role-name">Organizer</div>
+                            <div class="role-desc">Create and manage hackathon events, challenges, and activities</div>
+                        </button>
+                    </div>
+                    <p class="auth-signin-hint">Already registered? <a href="login.html" class="auth-link">Sign in here</a></p>
                 </div>
 
-                <!-- ===== SIGN IN PANEL ===== -->
-                <div class="auth-panel active" id="panel-signin">
-                    <div class="auth-panel-header">
-                        <h2 class="auth-panel-title">Welcome back</h2>
-                        <p class="auth-panel-desc">Sign in to your EPIC account</p>
-                    </div>
-
-                    <!-- OAuth Buttons -->
-                    <div class="oauth-buttons">
-                        <button class="oauth-btn oauth-github" onclick="oauthLogin('github')">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
-                            </svg>
-                            Continue with GitHub
-                        </button>
-                    </div>
-
-                    <!-- Divider -->
-                    <div class="auth-divider">
-                        <span>or continue with email</span>
-                    </div>
-
-                    <!-- Email Form -->
-                    <form class="auth-form" id="signin-form" onsubmit="handleSignIn(event)">
-                        <div class="form-group">
-                            <label class="form-label" for="signin-email">Email address</label>
-                            <input
-                                type="email"
-                                id="signin-email"
-                                class="form-input"
-                                placeholder="you@example.com"
-                                required
-                                autocomplete="email"
-                            >
-                        </div>
-                        <div class="form-group">
-                            <div class="form-label-row">
-                                <label class="form-label" for="signin-password">Password</label>
-                                <a href="#" class="form-link" onclick="showForgotPassword(event)">Forgot password?</a>
-                            </div>
-                            <div class="form-input-wrap">
-                                <input
-                                    type="password"
-                                    id="signin-password"
-                                    class="form-input"
-                                    placeholder="Enter your password"
-                                    required
-                                    autocomplete="current-password"
-                                >
-                                <button type="button" class="input-eye-btn" onclick="togglePassword('signin-password', this)" aria-label="Toggle password visibility">
-                                    <svg class="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                        <circle cx="12" cy="12" r="3"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="signin-error" class="form-error hidden"></div>
-                        <button type="submit" class="btn-auth-submit" id="signin-submit">
-                            <span class="btn-text">Sign In</span>
-                            <span class="btn-spinner hidden"></span>
-                        </button>
-                    </form>
-
-                    <p class="auth-switch-text">
-                        Don't have an account?
-                        <button class="auth-switch-link" onclick="switchTab('signup')">Create one free</button>
-                    </p>
-                </div>
-
-                <!-- ===== SIGN UP PANEL ===== -->
-                <div class="auth-panel" id="panel-signup">
-                    <div class="auth-panel-header">
-                        <h2 class="auth-panel-title">Create your account</h2>
-                        <p class="auth-panel-desc">Join EPIC Hackathon Singapore 2026</p>
-                    </div>
-
-                    <!-- OAuth Buttons -->
-                    <div class="oauth-buttons">
-                        <button class="oauth-btn oauth-github" onclick="oauthLogin('github')">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
-                            </svg>
-                            Sign up with GitHub
-                        </button>
-
-                    </div>
-
-                    <!-- Divider -->
-                    <div class="auth-divider">
-                        <span>or sign up with email</span>
-                    </div>
-
-                    <!-- Sign Up Form -->
-                    <form class="auth-form" id="signup-form" onsubmit="handleSignUp(event)">
+                <!-- STEP 1a: Participant Form -->
+                <div id="step-player" class="auth-step">
+                    <button class="back-btn" onclick="goBack('step-role')">&#8592; Back</button>
+                    <h2 class="form-title">Participant Registration</h2>
+                    <p class="form-subtitle">Tell us about yourself and your skills</p>
+                    <form id="form-player" novalidate>
+                        <div class="form-section-label">Basic Information</div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label" for="signup-firstname">First name</label>
-                                <input
-                                    type="text"
-                                    id="signup-firstname"
-                                    class="form-input"
-                                    placeholder="John"
-                                    required
-                                    autocomplete="given-name"
-                                >
+                                <label class="form-label">First Name <span class="required">*</span></label>
+                                <input type="text" id="p-firstname" class="form-input" placeholder="John" required />
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="signup-lastname">Last name</label>
-                                <input
-                                    type="text"
-                                    id="signup-lastname"
-                                    class="form-input"
-                                    placeholder="Doe"
-                                    required
-                                    autocomplete="family-name"
-                                >
+                                <label class="form-label">Last Name <span class="required">*</span></label>
+                                <input type="text" id="p-lastname" class="form-input" placeholder="Doe" required />
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label" for="signup-email">Email address</label>
-                            <input
-                                type="email"
-                                id="signup-email"
-                                class="form-input"
-                                placeholder="you@example.com"
-                                required
-                                autocomplete="email"
-                            >
+                            <label class="form-label">Email Address <span class="required">*</span></label>
+                            <input type="email" id="p-email" class="form-input" placeholder="john@example.com" required />
                         </div>
-                        <div class="form-group">
-                            <label class="form-label" for="signup-password">Password</label>
-                            <div class="form-input-wrap">
-                                <input
-                                    type="password"
-                                    id="signup-password"
-                                    class="form-input"
-                                    placeholder="At least 8 characters"
-                                    required
-                                    autocomplete="new-password"
-                                    oninput="checkPasswordStrength(this.value)"
-                                >
-                                <button type="button" class="input-eye-btn" onclick="togglePassword('signup-password', this)" aria-label="Toggle password visibility">
-                                    <svg class="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                        <circle cx="12" cy="12" r="3"/>
-                                    </svg>
-                                </button>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Password <span class="required">*</span></label>
+                                <input type="password" id="p-password" class="form-input" placeholder="Min. 8 characters" required />
                             </div>
-                            <div class="password-strength" id="password-strength">
-                                <div class="strength-bars">
-                                    <div class="strength-bar" id="bar-1"></div>
-                                    <div class="strength-bar" id="bar-2"></div>
-                                    <div class="strength-bar" id="bar-3"></div>
-                                    <div class="strength-bar" id="bar-4"></div>
-                                </div>
-                                <span class="strength-label" id="strength-label"></span>
+                            <div class="form-group">
+                                <label class="form-label">Confirm Password <span class="required">*</span></label>
+                                <input type="password" id="p-password2" class="form-input" placeholder="Repeat password" required />
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label" for="signup-role">Your role</label>
-                            <select id="signup-role" class="form-input form-select" required>
-                                <option value="" disabled selected>Select your role</option>
-                                <option value="developer">Developer / Engineer</option>
-                                <option value="designer">Designer / UX</option>
-                                <option value="pm">Product Manager</option>
-                                <option value="founder">Founder / Entrepreneur</option>
-                                <option value="business">Business / Marketing</option>
-                                <option value="other">Other</option>
+                            <label class="form-label">Role / Title <span class="required">*</span></label>
+                            <select id="p-role" class="form-input form-select" required>
+                                <option value="">Select your primary role</option>
+                                <option>Software Engineer</option>
+                                <option>Frontend Developer</option>
+                                <option>Backend Developer</option>
+                                <option>Full-Stack Developer</option>
+                                <option>AI / ML Engineer</option>
+                                <option>Data Scientist</option>
+                                <option>Product Manager</option>
+                                <option>UI/UX Designer</option>
+                                <option>DevOps / Cloud Engineer</option>
+                                <option>Blockchain Developer</option>
+                                <option>Student</option>
+                                <option>Other</option>
                             </select>
                         </div>
-                        <div class="form-group form-checkbox-group">
-                            <label class="form-checkbox">
-                                <input type="checkbox" id="signup-terms" required>
-                                <span class="checkbox-custom"></span>
-                                <span class="checkbox-label">
-                                    I agree to the <a href="#" class="form-link">Terms of Service</a> and <a href="#" class="form-link">Privacy Policy</a>
-                                </span>
-                            </label>
-                        </div>
-                        <div id="signup-error" class="form-error hidden"></div>
-                        <button type="submit" class="btn-auth-submit" id="signup-submit">
-                            <span class="btn-text">Create Account</span>
-                            <span class="btn-spinner hidden"></span>
-                        </button>
-                    </form>
-
-                    <p class="auth-switch-text">
-                        Already have an account?
-                        <button class="auth-switch-link" onclick="switchTab('signin')">Sign in</button>
-                    </p>
-                </div>
-
-                <!-- ===== FORGOT PASSWORD PANEL ===== -->
-                <div class="auth-panel" id="panel-forgot">
-                    <div class="auth-panel-header">
-                        <button class="auth-back-btn" onclick="switchTab('signin')">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M19 12H5M12 5l-7 7 7 7"/>
-                            </svg>
-                            Back to sign in
-                        </button>
-                        <h2 class="auth-panel-title">Reset password</h2>
-                        <p class="auth-panel-desc">Enter your email and we'll send you a reset link.</p>
-                    </div>
-                    <form class="auth-form" id="forgot-form" onsubmit="handleForgotPassword(event)">
                         <div class="form-group">
-                            <label class="form-label" for="forgot-email">Email address</label>
-                            <input
-                                type="email"
-                                id="forgot-email"
-                                class="form-input"
-                                placeholder="you@example.com"
-                                required
-                                autocomplete="email"
-                            >
+                            <label class="form-label">Bio <span class="optional">(optional)</span></label>
+                            <textarea id="p-bio" class="form-input form-textarea" placeholder="Tell us about yourself, your background, and what you're excited to build..." rows="3"></textarea>
                         </div>
-                        <div id="forgot-error" class="form-error hidden"></div>
-                        <div id="forgot-success" class="form-success hidden"></div>
-                        <button type="submit" class="btn-auth-submit" id="forgot-submit">
-                            <span class="btn-text">Send Reset Link</span>
-                            <span class="btn-spinner hidden"></span>
+                        <div class="form-section-label">Portfolio Links <span class="optional">(optional)</span></div>
+                        <div class="form-group">
+                            <label class="form-label">GitHub</label>
+                            <div class="input-prefix-wrap">
+                                <span class="input-prefix">github.com/</span>
+                                <input type="text" id="p-github" class="form-input with-prefix" placeholder="yourusername" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">LinkedIn</label>
+                            <div class="input-prefix-wrap">
+                                <span class="input-prefix">linkedin.com/in/</span>
+                                <input type="text" id="p-linkedin" class="form-input with-prefix" placeholder="yourprofile" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Discord Username</label>
+                            <input type="text" id="p-discord" class="form-input" placeholder="username#0000 or @username" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Personal Website / Portfolio</label>
+                            <input type="url" id="p-website" class="form-input" placeholder="https://yoursite.com" />
+                        </div>
+                        <div class="form-section-label">Skills <span class="optional">(optional)</span></div>
+                        <div class="form-group">
+                            <label class="form-label">Tech Stack / Skills</label>
+                            <input type="text" id="p-skills" class="form-input" placeholder="e.g. React, Python, AWS, Figma..." />
+                            <div class="form-hint">Separate with commas</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Looking for teammates?</label>
+                            <div class="radio-group">
+                                <label class="radio-label"><input type="radio" name="p-team" value="yes" /> Yes, I'm looking for a team</label>
+                                <label class="radio-label"><input type="radio" name="p-team" value="no" /> No, I already have a team</label>
+                                <label class="radio-label"><input type="radio" name="p-team" value="solo" checked /> Participating solo</label>
+                            </div>
+                        </div>
+                        <div id="player-error" class="form-message error hidden"></div>
+                        <button type="submit" class="btn btn-primary btn-full btn-submit" id="player-submit-btn">
+                            <span class="btn-text">Send Verification Email &#8594;</span>
+                            <span class="btn-loading hidden">Sending...</span>
                         </button>
                     </form>
                 </div>
 
-                <!-- ===== EMAIL VERIFICATION PANEL ===== -->
-                <div class="auth-panel" id="panel-verify">
-                    <div class="auth-panel-header verify-icon-wrap">
-                        <div class="verify-icon">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                                <polyline points="22,6 12,13 2,6"/>
-                            </svg>
+                <!-- STEP 1b: Organizer Form -->
+                <div id="step-admin" class="auth-step">
+                    <button class="back-btn" onclick="goBack('step-role')">&#8592; Back</button>
+                    <h2 class="form-title">Organizer Registration</h2>
+                    <p class="form-subtitle">Set up your organizer account and create your first event</p>
+                    <form id="form-admin" novalidate>
+                        <div class="form-section-label">Account Information</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">First Name <span class="required">*</span></label>
+                                <input type="text" id="a-firstname" class="form-input" placeholder="Jane" required />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Last Name <span class="required">*</span></label>
+                                <input type="text" id="a-lastname" class="form-input" placeholder="Smith" required />
+                            </div>
                         </div>
-                        <h2 class="auth-panel-title">Check your email</h2>
-                        <p class="auth-panel-desc" id="verify-email-desc">We sent a verification link to <strong id="verify-email-addr"></strong></p>
-                    </div>
+                        <div class="form-group">
+                            <label class="form-label">Email Address <span class="required">*</span></label>
+                            <input type="email" id="a-email" class="form-input" placeholder="jane@organization.com" required />
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Password <span class="required">*</span></label>
+                                <input type="password" id="a-password" class="form-input" placeholder="Min. 8 characters" required />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Confirm Password <span class="required">*</span></label>
+                                <input type="password" id="a-password2" class="form-input" placeholder="Repeat password" required />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Organization / Company <span class="required">*</span></label>
+                            <input type="text" id="a-org" class="form-input" placeholder="Your company or organization name" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Your Role <span class="required">*</span></label>
+                            <select id="a-role" class="form-input form-select" required>
+                                <option value="">Select your role</option>
+                                <option>Event Organizer</option>
+                                <option>Sponsor Representative</option>
+                                <option>Mentor / Judge</option>
+                                <option>Community Manager</option>
+                                <option>Marketing / PR</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <div class="form-section-label">Event Details <span class="optional">(optional — you can add events after registration)</span></div>
+                        <div class="form-group">
+                            <label class="form-label">Event Name</label>
+                            <input type="text" id="a-event-name" class="form-input" placeholder="e.g. EPIC Hackathon Singapore 2025" />
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Start Date &amp; Time</label>
+                                <input type="datetime-local" id="a-event-start" class="form-input" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">End Date &amp; Time</label>
+                                <input type="datetime-local" id="a-event-end" class="form-input" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Event Location</label>
+                            <input type="text" id="a-event-location" class="form-input" placeholder="Venue address or online link" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Event Description</label>
+                            <textarea id="a-event-desc" class="form-input form-textarea" placeholder="Describe your event, goals, and what participants can expect..." rows="3"></textarea>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Ticket Price</label>
+                                <select id="a-event-price" class="form-input form-select">
+                                    <option value="free">Free</option>
+                                    <option value="paid">Paid</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Capacity</label>
+                                <select id="a-event-capacity" class="form-input form-select">
+                                    <option value="unlimited">Unlimited</option>
+                                    <option value="50">Up to 50</option>
+                                    <option value="100">Up to 100</option>
+                                    <option value="200">Up to 200</option>
+                                    <option value="500">Up to 500</option>
+                                    <option value="1000">Up to 1000</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Requires Approval?</label>
+                            <div class="toggle-wrap">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="a-event-approval" />
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span class="toggle-label">Participants need approval to join</span>
+                            </div>
+                        </div>
+                        <div id="admin-error" class="form-message error hidden"></div>
+                        <button type="submit" class="btn btn-primary btn-full btn-submit" id="admin-submit-btn">
+                            <span class="btn-text">Send Verification Email &#8594;</span>
+                            <span class="btn-loading hidden">Sending...</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- STEP 2: Email Sent -->
+                <div id="step-verify" class="auth-step">
+                    <div class="verify-icon">&#9993;</div>
+                    <h2 class="form-title">Check Your Email</h2>
+                    <p class="form-subtitle">We've sent a verification link to</p>
+                    <div class="verify-email" id="verify-email-display"></div>
+                    <p class="verify-note">Click the link in the email to complete your registration. The link expires in 24 hours.</p>
                     <div class="verify-actions">
-                        <p class="verify-note">Didn't receive it? Check your spam folder or</p>
-                        <button class="btn-auth-outline" onclick="resendVerification()">Resend email</button>
-                        <button class="auth-switch-link" onclick="switchTab('signin')">Back to sign in</button>
+                        <button class="btn btn-ghost btn-full" id="resend-btn" onclick="resendVerification()">Resend Email</button>
+                        <a href="index.html" class="btn btn-ghost btn-full">Back to Home</a>
                     </div>
+                    <div id="resend-message" class="form-message hidden"></div>
+                </div>
+
+                <!-- STEP 3: Verified Success -->
+                <div id="step-success" class="auth-step">
+                    <div class="verify-icon success-icon">&#10003;</div>
+                    <h2 class="form-title">Registration Complete!</h2>
+                    <p class="form-subtitle">Your account has been verified and your information has been saved.</p>
+                    <p class="verify-note">Redirecting to homepage in <span id="countdown">5</span> seconds...</p>
+                    <a href="index.html" class="btn btn-primary btn-full" style="margin-top:1.5rem">Go to Homepage &#8594;</a>
                 </div>
 
             </div>
         </div>
-
     </div>
-
-    <script src="auth.js"></script>
+</main>
+<script src="auth.js"></script>
 </body>
 </html>

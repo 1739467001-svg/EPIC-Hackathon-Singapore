@@ -1,329 +1,287 @@
 /**
- * EPIC Hackathon Singapore — Auth Logic (Supabase)
- * auth.js
+ * EPIC Hackathon Singapore — Registration Logic
+ * auth.js  (v2 — multi-step, role-based, email verification)
  */
 
-/* ========================================
-   Supabase 初始化
-   ======================================== */
-const SUPABASE_URL  = 'https://ahwafopsbwgevogeezqu.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFod2Fmb3BzYndnZXZvZ2VlenF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQ5MTYsImV4cCI6MjA5MTY3MDkxNn0.wK7fZDyFaA39et0szUmMfvKVXgXTsrMxxt2Yo-ctFp0';
+const API_BASE = 'http://43.130.98.104:8080/api';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+let currentRole = null;
+let pendingEmail = null;
 
-/* ========================================
-   页面加载：检测 OAuth 回调 & 已登录状态
-   ======================================== */
-document.addEventListener('DOMContentLoaded', async () => {
-    // 处理 URL hash 中的 OAuth 回调 token（Supabase 自动写入）
-    const { data: { session }, error } = await supabase.auth.getSession();
+/* ============================================================
+   Page Init
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
 
-    if (session) {
-        // 已登录，跳回主页
-        window.location.href = 'index.html';
+    // Coming back from email verification link
+    if (params.get('verified') === '1') {
+        showStep('step-success');
+        startCountdown();
         return;
     }
 
-    // URL 参数处理
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('tab') === 'signup') switchTab('signup');
-
-    // 处理 OAuth 错误回调
-    const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
-    if (hashParams.get('error')) {
-        switchTab('signin');
-        showError('signin-error', hashParams.get('error_description') || 'Authentication failed.');
+    // Error from verification
+    const err = params.get('error');
+    if (err) {
+        showStep('step-role');
+        const msg = err === 'token_expired'
+            ? 'Your verification link has expired. Please register again.'
+            : err === 'invalid_token'
+            ? 'Invalid verification link. Please register again.'
+            : 'An error occurred. Please try again.';
+        showToast(msg, 'error');
     }
+
+    // Form submit listeners
+    const fp = document.getElementById('form-player');
+    const fa = document.getElementById('form-admin');
+    if (fp) fp.addEventListener('submit', handlePlayerSubmit);
+    if (fa) fa.addEventListener('submit', handleAdminSubmit);
 });
 
-/* ========================================
-   Tab / Panel 切换
-   ======================================== */
-function switchTab(panel) {
-    document.querySelectorAll('.auth-tab').forEach(tab => {
-        tab.classList.toggle('active', tab.id === `tab-${panel}`);
-    });
-    document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
-    const target = document.getElementById(`panel-${panel}`);
-    if (target) target.classList.add('active');
-    clearErrors();
+/* ============================================================
+   Step Navigation
+   ============================================================ */
+function showStep(stepId) {
+    document.querySelectorAll('.auth-step').forEach(s => s.classList.remove('active'));
+    const el = document.getElementById(stepId);
+    if (el) el.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function clearErrors() {
-    document.querySelectorAll('.form-error, .form-success').forEach(el => {
-        el.classList.add('hidden');
-        el.textContent = '';
-    });
+function selectRole(role) {
+    currentRole = role;
+    showStep(role === 'player' ? 'step-player' : 'step-admin');
 }
 
-/* ========================================
-   工具函数
-   ======================================== */
+function goBack(targetStep) {
+    showStep(targetStep);
+}
+
+/* ============================================================
+   Validation Helpers
+   ============================================================ */
+function validateEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function showError(elementId, msg) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    el.classList.add('error');
+}
+
+function clearError(elementId) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    el.textContent = '';
+    el.classList.add('hidden');
+}
+
 function setLoading(btnId, loading) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
-    btn.disabled = loading;
-    btn.querySelector('.btn-text').classList.toggle('hidden', loading);
-    btn.querySelector('.btn-spinner').classList.toggle('hidden', !loading);
-}
-
-function showError(elementId, message) {
-    const el = document.getElementById(elementId);
-    if (!el) return;
-    el.textContent = message;
-    el.classList.remove('hidden');
-}
-
-function showSuccess(elementId, message) {
-    const el = document.getElementById(elementId);
-    if (!el) return;
-    el.textContent = message;
-    el.classList.remove('hidden');
-}
-
-function togglePassword(inputId, btn) {
-    const input = document.getElementById(inputId);
-    const isPassword = input.type === 'password';
-    input.type = isPassword ? 'text' : 'password';
-    btn.innerHTML = isPassword
-        ? `<svg class="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-               <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-               <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-               <line x1="1" y1="1" x2="23" y2="23"/>
-           </svg>`
-        : `<svg class="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-               <circle cx="12" cy="12" r="3"/>
-           </svg>`;
-}
-
-function checkPasswordStrength(value) {
-    const container = document.getElementById('password-strength');
-    const label = document.getElementById('strength-label');
-    if (!value) {
-        container.classList.remove('visible', 'strength-weak', 'strength-fair', 'strength-good', 'strength-strong');
-        return;
-    }
-    container.classList.add('visible');
-    container.classList.remove('strength-weak', 'strength-fair', 'strength-good', 'strength-strong');
-    let score = 0;
-    if (value.length >= 8)         score++;
-    if (/[A-Z]/.test(value))       score++;
-    if (/[0-9]/.test(value))       score++;
-    if (/[^A-Za-z0-9]/.test(value)) score++;
-    const levels = ['strength-weak', 'strength-fair', 'strength-good', 'strength-strong'];
-    const labels = ['Weak', 'Fair', 'Good', 'Strong'];
-    const idx = Math.max(0, score - 1);
-    container.classList.add(levels[idx]);
-    label.textContent = labels[idx];
-}
-
-/* ========================================
-   邮箱登录（Sign In）
-   ======================================== */
-async function handleSignIn(event) {
-    event.preventDefault();
-    clearErrors();
-
-    const email    = document.getElementById('signin-email').value.trim();
-    const password = document.getElementById('signin-password').value;
-
-    if (!email || !password) {
-        showError('signin-error', 'Please fill in all fields.');
-        return;
-    }
-
-    setLoading('signin-submit', true);
-
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    setLoading('signin-submit', false);
-
-    if (error) {
-        // 友好化错误提示
-        const msg = error.message.includes('Invalid login')
-            ? 'Incorrect email or password. Please try again.'
-            : error.message;
-        showError('signin-error', msg);
-        return;
-    }
-
-    // 登录成功 → 跳回主页
-    window.location.href = 'index.html';
-}
-
-/* ========================================
-   邮箱注册（Sign Up）
-   ======================================== */
-async function handleSignUp(event) {
-    event.preventDefault();
-    clearErrors();
-
-    const firstName = document.getElementById('signup-firstname').value.trim();
-    const lastName  = document.getElementById('signup-lastname').value.trim();
-    const email     = document.getElementById('signup-email').value.trim();
-    const password  = document.getElementById('signup-password').value;
-    const role      = document.getElementById('signup-role').value;
-    const terms     = document.getElementById('signup-terms').checked;
-
-    if (!firstName || !lastName || !email || !password || !role) {
-        showError('signup-error', 'Please fill in all required fields.');
-        return;
-    }
-    if (password.length < 8) {
-        showError('signup-error', 'Password must be at least 8 characters.');
-        return;
-    }
-    if (!terms) {
-        showError('signup-error', 'Please accept the Terms of Service to continue.');
-        return;
-    }
-
-    setLoading('signup-submit', true);
-
-    const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-            // 将姓名、角色存入用户元数据
-            data: {
-                full_name:  `${firstName} ${lastName}`,
-                first_name: firstName,
-                last_name:  lastName,
-                role:       role
-            },
-            // 邮箱验证后跳转地址
-            emailRedirectTo: `${window.location.origin}/index.html`
-        }
-    });
-
-    setLoading('signup-submit', false);
-
-    if (error) {
-        const msg = error.message.includes('already registered')
-            ? 'This email is already registered. Please sign in instead.'
-            : error.message;
-        showError('signup-error', msg);
-        return;
-    }
-
-    // 注册成功 → 显示邮箱验证提示面板
-    document.getElementById('verify-email-addr').textContent = email;
-    switchTab('verify');
-}
-
-/* ========================================
-   忘记密码
-   ======================================== */
-function showForgotPassword(event) {
-    event.preventDefault();
-    const signinEmail = document.getElementById('signin-email').value;
-    if (signinEmail) document.getElementById('forgot-email').value = signinEmail;
-    switchTab('forgot');
-}
-
-async function handleForgotPassword(event) {
-    event.preventDefault();
-    clearErrors();
-
-    const email = document.getElementById('forgot-email').value.trim();
-    if (!email) {
-        showError('forgot-error', 'Please enter your email address.');
-        return;
-    }
-
-    setLoading('forgot-submit', true);
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth.html?tab=reset`
-    });
-
-    setLoading('forgot-submit', false);
-
-    if (error) {
-        showError('forgot-error', error.message);
-        return;
-    }
-
-    showSuccess('forgot-success', `Reset link sent to ${email}. Please check your inbox.`);
-    document.getElementById('forgot-form').reset();
-}
-
-/* ========================================
-   重新发送验证邮件
-   ======================================== */
-async function resendVerification() {
-    const email = document.getElementById('verify-email-addr').textContent;
-    if (!email) return;
-
-    const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email,
-        options: { emailRedirectTo: `${window.location.origin}/index.html` }
-    });
-
-    const note = document.querySelector('.verify-note');
-    if (note) {
-        note.textContent = error
-            ? `Failed to resend: ${error.message}`
-            : `Email resent to ${email} ✓`;
-        setTimeout(() => {
-            note.textContent = "Didn't receive it? Check your spam folder or";
-        }, 4000);
-    }
-}
-
-/* ========================================
-   OAuth 登录（Google / GitHub / LinkedIn）
-   ======================================== */
-async function oauthLogin(provider) {
-    showOAuthLoading(provider);
-
-    // Supabase provider 名称映射
-    const providerMap = {
-        google:   'google',
-        github:   'github',
-        linkedin: 'linkedin_oidc'
-    };
-
-    const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: providerMap[provider],
-        options: {
-            redirectTo: 'http://43.130.98.104:8080/index.html',
-            queryParams: provider === 'google' ? { access_type: 'offline', prompt: 'select_account' } : {}
-        }
-    });
-
-    if (error) {
-        hideOAuthLoading();
-        showError('signin-error', error.message);
-    }
-    // 成功时 Supabase 自动跳转到 OAuth 授权页，无需额外处理
-}
-
-/* ---- OAuth Loading Overlay ---- */
-function showOAuthLoading(provider) {
-    let overlay = document.getElementById('oauth-loading-overlay');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'oauth-loading-overlay';
-        overlay.className = 'oauth-loading-overlay';
-        overlay.innerHTML = `
-            <div class="oauth-loading-spinner"></div>
-            <p class="oauth-loading-text" id="oauth-loading-text">Connecting to ${capitalize(provider)}...</p>
-        `;
-        document.body.appendChild(overlay);
+    if (loading) {
+        btn.classList.add('loading');
+        btn.disabled = true;
     } else {
-        document.getElementById('oauth-loading-text').textContent = `Connecting to ${capitalize(provider)}...`;
+        btn.classList.remove('loading');
+        btn.disabled = false;
     }
-    requestAnimationFrame(() => overlay.classList.add('visible'));
 }
 
-function hideOAuthLoading() {
-    const overlay = document.getElementById('oauth-loading-overlay');
-    if (overlay) overlay.classList.remove('visible');
+/* ============================================================
+   Participant Form Submit
+   ============================================================ */
+async function handlePlayerSubmit(e) {
+    e.preventDefault();
+    clearError('player-error');
+
+    const firstName  = document.getElementById('p-firstname').value.trim();
+    const lastName   = document.getElementById('p-lastname').value.trim();
+    const email      = document.getElementById('p-email').value.trim();
+    const password   = document.getElementById('p-password').value;
+    const password2  = document.getElementById('p-password2').value;
+    const title      = document.getElementById('p-role').value;
+    const bio        = document.getElementById('p-bio').value.trim();
+    const github     = document.getElementById('p-github').value.trim();
+    const linkedin   = document.getElementById('p-linkedin').value.trim();
+    const discord    = document.getElementById('p-discord').value.trim();
+    const website    = document.getElementById('p-website').value.trim();
+    const skills     = document.getElementById('p-skills').value.trim();
+    const teamStatus = document.querySelector('input[name="p-team"]:checked')?.value || 'solo';
+
+    if (!firstName || !lastName) return showError('player-error', 'Please enter your full name.');
+    if (!validateEmail(email))   return showError('player-error', 'Please enter a valid email address.');
+    if (password.length < 8)     return showError('player-error', 'Password must be at least 8 characters.');
+    if (password !== password2)  return showError('player-error', 'Passwords do not match.');
+    if (!title)                  return showError('player-error', 'Please select your role / title.');
+
+    setLoading('player-submit-btn', true);
+
+    try {
+        const res = await fetch(`${API_BASE}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                role: 'player',
+                email, password,
+                firstName, lastName, title, bio,
+                github, linkedin, discord, website, skills, teamStatus
+            })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            showError('player-error', data.error || 'Registration failed. Please try again.');
+            setLoading('player-submit-btn', false);
+            return;
+        }
+
+        pendingEmail = email;
+        document.getElementById('verify-email-display').textContent = email;
+        showStep('step-verify');
+    } catch (err) {
+        showError('player-error', 'Network error. Please check your connection and try again.');
+        setLoading('player-submit-btn', false);
+    }
 }
 
-function capitalize(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
+/* ============================================================
+   Organizer Form Submit
+   ============================================================ */
+async function handleAdminSubmit(e) {
+    e.preventDefault();
+    clearError('admin-error');
+
+    const firstName      = document.getElementById('a-firstname').value.trim();
+    const lastName       = document.getElementById('a-lastname').value.trim();
+    const email          = document.getElementById('a-email').value.trim();
+    const password       = document.getElementById('a-password').value;
+    const password2      = document.getElementById('a-password2').value;
+    const organization   = document.getElementById('a-org').value.trim();
+    const adminRole      = document.getElementById('a-role').value;
+    const eventName      = document.getElementById('a-event-name').value.trim();
+    const eventStart     = document.getElementById('a-event-start').value;
+    const eventEnd       = document.getElementById('a-event-end').value;
+    const eventLocation  = document.getElementById('a-event-location').value.trim();
+    const eventDesc      = document.getElementById('a-event-desc').value.trim();
+    const eventPrice     = document.getElementById('a-event-price').value;
+    const eventCapacity  = document.getElementById('a-event-capacity').value;
+    const eventApproval  = document.getElementById('a-event-approval').checked;
+
+    if (!firstName || !lastName) return showError('admin-error', 'Please enter your full name.');
+    if (!validateEmail(email))   return showError('admin-error', 'Please enter a valid email address.');
+    if (password.length < 8)     return showError('admin-error', 'Password must be at least 8 characters.');
+    if (password !== password2)  return showError('admin-error', 'Passwords do not match.');
+    if (!organization)           return showError('admin-error', 'Please enter your organization name.');
+    if (!adminRole)              return showError('admin-error', 'Please select your role.');
+
+    setLoading('admin-submit-btn', true);
+
+    try {
+        const res = await fetch(`${API_BASE}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                role: 'admin',
+                email, password,
+                firstName, lastName, organization, adminRole,
+                eventName, eventStart, eventEnd, eventLocation,
+                eventDesc, eventPrice, eventCapacity, eventApproval
+            })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            showError('admin-error', data.error || 'Registration failed. Please try again.');
+            setLoading('admin-submit-btn', false);
+            return;
+        }
+
+        pendingEmail = email;
+        document.getElementById('verify-email-display').textContent = email;
+        showStep('step-verify');
+    } catch (err) {
+        showError('admin-error', 'Network error. Please check your connection and try again.');
+        setLoading('admin-submit-btn', false);
+    }
+}
+
+/* ============================================================
+   Resend Verification
+   ============================================================ */
+async function resendVerification() {
+    const btn = document.getElementById('resend-btn');
+    const msgEl = document.getElementById('resend-message');
+
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    msgEl.classList.add('hidden');
+
+    try {
+        const res = await fetch(`${API_BASE}/resend`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: pendingEmail, role: currentRole })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            msgEl.textContent = 'Verification email resent! Please check your inbox.';
+            msgEl.className = 'form-message success';
+            msgEl.classList.remove('hidden');
+        } else {
+            msgEl.textContent = data.error || 'Failed to resend. Please try again.';
+            msgEl.className = 'form-message error';
+            msgEl.classList.remove('hidden');
+        }
+    } catch {
+        msgEl.textContent = 'Network error. Please try again.';
+        msgEl.className = 'form-message error';
+        msgEl.classList.remove('hidden');
+    }
+
+    setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = 'Resend Email';
+    }, 30000);
+}
+
+/* ============================================================
+   Success Countdown
+   ============================================================ */
+function startCountdown() {
+    let count = 5;
+    const el = document.getElementById('countdown');
+    if (!el) return;
+    const timer = setInterval(() => {
+        count--;
+        el.textContent = count;
+        if (count <= 0) {
+            clearInterval(timer);
+            window.location.href = 'index.html';
+        }
+    }, 1000);
+}
+
+/* ============================================================
+   Toast Notification
+   ============================================================ */
+function showToast(msg, type) {
+    const toast = document.createElement('div');
+    toast.style.cssText = [
+        'position:fixed;top:80px;right:20px;z-index:9999;',
+        'padding:12px 18px;border-radius:10px;font-size:14px;',
+        'max-width:340px;line-height:1.5;',
+        type === 'error'
+            ? 'background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.3);color:#ff8888;'
+            : 'background:rgba(80,200,120,0.15);border:1px solid rgba(80,200,120,0.3);color:#88d4a8;'
+    ].join('');
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 6000);
 }
