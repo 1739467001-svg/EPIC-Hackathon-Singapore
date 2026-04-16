@@ -1,27 +1,23 @@
 /**
  * EPIC Hackathon Singapore — Registration API Server
- * api-server.js
  *
- * Handles:
+ * Endpoints:
  *  POST /api/register   — store pending registration, send verification email
- *  GET  /api/verify     — verify token, write to Supabase, redirect to success
+ *  GET  /api/verify     — verify token, write to Supabase, redirect to login
  *  POST /api/resend     — resend verification email
+ *  POST /api/login      — verify email+password, return user info
  *
  * Port: 3001 (nginx proxies /api/ → localhost:3001)
  */
 
-const http        = require('http');
-const https       = require('https');
-const nodemailer  = require('nodemailer');
-const crypto      = require('crypto');
-const url         = require('url');
+const http       = require('http');
+const https      = require('https');
+const nodemailer = require('nodemailer');
+const crypto     = require('crypto');
+const url        = require('url');
 
-/* ============================================================
-   Config
-   ============================================================ */
 const PORT         = 3001;
 const BASE_URL     = 'http://43.130.98.104:8080';
-const SUPABASE_URL = 'https://ahwafopsbwgevogeezqu.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFod2Fmb3BzYndnZXZvZ2VlenF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQ5MTYsImV4cCI6MjA5MTY3MDkxNn0.wK7fZDyFaA39et0szUmMfvKVXgXTsrMxxt2Yo-ctFp0';
 
 const SMTP = {
@@ -34,15 +30,8 @@ const SMTP = {
     }
 };
 
-/* ============================================================
-   In-memory pending store  { token -> { data, expiresAt } }
-   (For production, use Redis or a DB table)
-   ============================================================ */
 const pending = new Map();
 
-/* ============================================================
-   Nodemailer transporter
-   ============================================================ */
 const transporter = nodemailer.createTransport({
     host: SMTP.host,
     port: SMTP.port,
@@ -51,125 +40,70 @@ const transporter = nodemailer.createTransport({
     tls: { rejectUnauthorized: false }
 });
 
-/* ============================================================
-   Supabase REST helper
-   ============================================================ */
-function supabaseInsert(table, record) {
+/* ---- Supabase helpers ---- */
+function supabaseRequest(method, path, body) {
     return new Promise((resolve, reject) => {
-        const body = JSON.stringify(record);
+        const bodyStr = body ? JSON.stringify(body) : null;
         const options = {
             hostname: 'ahwafopsbwgevogeezqu.supabase.co',
-            path: `/rest/v1/${table}`,
-            method: 'POST',
+            path,
+            method,
             headers: {
                 'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(body),
                 'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Authorization': 'Bearer ' + SUPABASE_KEY,
                 'Prefer': 'return=representation'
             }
         };
+        if (bodyStr) options.headers['Content-Length'] = Buffer.byteLength(bodyStr);
         const req = https.request(options, (res) => {
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
-                if (res.statusCode >= 200 && res.statusCode < 300) {
-                    resolve(JSON.parse(data));
-                } else {
-                    reject(new Error(`Supabase error ${res.statusCode}: ${data}`));
-                }
+                try { resolve({ status: res.statusCode, data: data ? JSON.parse(data) : null }); }
+                catch (e) { resolve({ status: res.statusCode, data: null }); }
             });
         });
         req.on('error', reject);
-        req.write(body);
+        if (bodyStr) req.write(bodyStr);
         req.end();
     });
 }
 
-/* ============================================================
-   Email template
-   ============================================================ */
-function buildEmail(toEmail, verifyLink, role) {
-    const roleLabel = role === 'admin' ? 'Organizer' : 'Participant';
+function supabaseInsert(table, record) {
+    return supabaseRequest('POST', '/rest/v1/' + table, record).then(r => {
+        if (r.status >= 200 && r.status < 300) return r.data;
+        throw new Error('Supabase insert error ' + r.status + ': ' + JSON.stringify(r.data));
+    });
+}
+
+function supabaseQuery(table, filter) {
+    return supabaseRequest('GET', '/rest/v1/' + table + '?' + filter).then(r => {
+        if (r.status >= 200 && r.status < 300) return r.data;
+        throw new Error('Supabase query error ' + r.status + ': ' + JSON.stringify(r.data));
+    });
+}
+
+/* ---- Email template ---- */
+function buildEmail(toEmail, verifyLink) {
     return {
-        from: `"EPIC Hackathon Singapore" <${SMTP.auth.user}>`,
+        from: '"EPIC Hackathon Singapore" <' + SMTP.auth.user + '>',
         to: toEmail,
-        subject: `Verify your EPIC Hackathon registration`,
-        html: `
-<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"/></head>
-<body style="margin:0;padding:0;background:#0a0a0a;font-family:'Inter',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;">
-        <!-- Header -->
-        <tr>
-          <td style="background:#000;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.07);">
-            <span style="font-size:22px;font-weight:900;letter-spacing:0.1em;color:#fff;">EPIC</span>
-            <span style="font-size:13px;color:rgba(255,255,255,0.4);margin-left:12px;">Hackathon Singapore</span>
-          </td>
-        </tr>
-        <!-- Body -->
-        <tr>
-          <td style="padding:36px 36px 28px;">
-            <h1 style="font-size:24px;font-weight:800;color:#fff;margin:0 0 12px;letter-spacing:-0.5px;">Verify your email address</h1>
-            <p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 24px;">
-              Thanks for registering as a <strong style="color:#fff;">${roleLabel}</strong> at EPIC Hackathon Singapore!<br/>
-              Click the button below to verify your email and complete your registration.
-            </p>
-            <a href="${verifyLink}" style="display:inline-block;background:#fff;color:#000;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;text-decoration:none;letter-spacing:-0.2px;">
-              Verify Email &amp; Complete Registration →
-            </a>
-            <p style="font-size:13px;color:rgba(255,255,255,0.35);margin:24px 0 0;line-height:1.6;">
-              This link expires in <strong style="color:rgba(255,255,255,0.55);">24 hours</strong>.<br/>
-              If you didn't register, you can safely ignore this email.
-            </p>
-          </td>
-        </tr>
-        <!-- Link fallback -->
-        <tr>
-          <td style="padding:0 36px 28px;">
-            <p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">
-              Or copy this link: <a href="${verifyLink}" style="color:rgba(255,255,255,0.45);">${verifyLink}</a>
-            </p>
-          </td>
-        </tr>
-        <!-- Footer -->
-        <tr>
-          <td style="background:rgba(255,255,255,0.025);padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);">
-            <p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">
-              &copy; 2025 EPIC Hackathon Singapore &nbsp;&middot;&nbsp;
-              <a href="${BASE_URL}" style="color:rgba(255,255,255,0.35);text-decoration:none;">Visit Website</a>
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`
+        subject: 'Verify your EPIC Hackathon registration',
+        html: '<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;"><tr><td style="background:#000;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.07);"><span style="font-size:22px;font-weight:900;color:#fff;">EPIC</span><span style="font-size:13px;color:rgba(255,255,255,0.4);margin-left:12px;">Hackathon Singapore</span></td></tr><tr><td style="padding:36px 36px 28px;"><h1 style="font-size:24px;font-weight:800;color:#fff;margin:0 0 12px;">Verify your email address</h1><p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 24px;">Thanks for registering for EPIC Hackathon Singapore!<br/>Click the button below to verify your email and complete your registration.</p><a href="' + verifyLink + '" style="display:inline-block;background:#fff;color:#000;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;text-decoration:none;">Verify Email &amp; Complete Registration &#8594;</a><p style="font-size:13px;color:rgba(255,255,255,0.35);margin:24px 0 0;line-height:1.6;">This link expires in <strong style="color:rgba(255,255,255,0.55);">24 hours</strong>.<br/>If you did not register, you can safely ignore this email.</p></td></tr><tr><td style="padding:0 36px 28px;"><p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">Or copy this link: <a href="' + verifyLink + '" style="color:rgba(255,255,255,0.45);">' + verifyLink + '</a></p></td></tr><tr><td style="background:rgba(255,255,255,0.025);padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);"><p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">&copy; 2026 EPIC Hackathon Singapore &nbsp;&middot;&nbsp;<a href="' + BASE_URL + '" style="color:rgba(255,255,255,0.35);text-decoration:none;">Visit Website</a></p></td></tr></table></td></tr></table></body></html>'
     };
 }
 
-/* ============================================================
-   Request body parser
-   ============================================================ */
+/* ---- Helpers ---- */
 function parseBody(req) {
     return new Promise((resolve, reject) => {
         let body = '';
         req.on('data', chunk => body += chunk);
-        req.on('end', () => {
-            try { resolve(JSON.parse(body)); }
-            catch (e) { resolve({}); }
-        });
+        req.on('end', () => { try { resolve(JSON.parse(body)); } catch (e) { resolve({}); } });
         req.on('error', reject);
     });
 }
 
-/* ============================================================
-   CORS helper
-   ============================================================ */
 function setCORS(res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -182,184 +116,126 @@ function json(res, status, data) {
     res.end(JSON.stringify(data));
 }
 
-/* ============================================================
-   HTTP Server
-   ============================================================ */
+function hashPassword(pw) {
+    return crypto.createHash('sha256').update(pw).digest('hex');
+}
+
+/* ---- HTTP Server ---- */
 const server = http.createServer(async (req, res) => {
-    const parsed = url.parse(req.url, true);
+    const parsed   = url.parse(req.url, true);
     const pathname = parsed.pathname;
 
-    // Preflight
-    if (req.method === 'OPTIONS') {
-        setCORS(res);
-        res.writeHead(204);
-        res.end();
-        return;
-    }
+    if (req.method === 'OPTIONS') { setCORS(res); res.writeHead(204); res.end(); return; }
 
-    /* ----------------------------------------------------------
-       POST /api/register
-       Body: { role, email, password, ...formFields }
-       ---------------------------------------------------------- */
+    /* POST /api/register */
     if (pathname === '/api/register' && req.method === 'POST') {
         try {
             const body = await parseBody(req);
-            const { role, email, password } = body;
+            const { email, password, firstName, lastName, role } = body;
+            if (!email || !password) return json(res, 400, { error: 'Email and password are required.' });
+            if (password.length < 8) return json(res, 400, { error: 'Password must be at least 8 characters.' });
 
-            if (!role || !email || !password) {
-                return json(res, 400, { error: 'Missing required fields.' });
-            }
-            if (password.length < 8) {
-                return json(res, 400, { error: 'Password must be at least 8 characters.' });
-            }
+            // Check duplicate
+            const existing = await supabaseQuery('players', 'email=eq.' + encodeURIComponent(email) + '&select=email');
+            if (existing && existing.length > 0) return json(res, 409, { error: 'This email is already registered. Please sign in.' });
 
-            // Generate token
-            const token = crypto.randomBytes(32).toString('hex');
-            const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24h
-
-            // Store pending
+            const token     = crypto.randomBytes(32).toString('hex');
+            const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
             pending.set(token, { data: body, expiresAt });
 
-            // Build verify link
-            const verifyLink = `${BASE_URL}/api/verify?token=${token}`;
-
-            // Send email
-            await transporter.sendMail(buildEmail(email, verifyLink, role));
-
-            return json(res, 200, { ok: true, message: 'Verification email sent.' });
+            const verifyLink = BASE_URL + '/api/verify?token=' + token;
+            await transporter.sendMail(buildEmail(email, verifyLink));
+            return json(res, 200, { ok: true, message: 'Verification email sent. Please check your inbox.' });
         } catch (err) {
-            console.error('[register]', err);
+            console.error('[register]', err.message);
             return json(res, 500, { error: 'Failed to send verification email. Please try again.' });
         }
     }
 
-    /* ----------------------------------------------------------
-       GET /api/verify?token=xxx
-       ---------------------------------------------------------- */
+    /* GET /api/verify */
     if (pathname === '/api/verify' && req.method === 'GET') {
         const token = parsed.query.token;
         if (!token || !pending.has(token)) {
-            setCORS(res);
-            res.writeHead(302, { Location: `${BASE_URL}/auth.html?error=invalid_token` });
-            res.end();
-            return;
+            setCORS(res); res.writeHead(302, { Location: BASE_URL + '/auth.html?error=invalid_token' }); res.end(); return;
         }
-
         const entry = pending.get(token);
         if (Date.now() > entry.expiresAt) {
             pending.delete(token);
-            setCORS(res);
-            res.writeHead(302, { Location: `${BASE_URL}/auth.html?error=token_expired` });
-            res.end();
-            return;
+            setCORS(res); res.writeHead(302, { Location: BASE_URL + '/auth.html?error=token_expired' }); res.end(); return;
         }
-
         const { data } = entry;
         pending.delete(token);
-
         try {
-            // Hash password (simple SHA-256 for demo; use bcrypt in production)
-            const pwHash = crypto.createHash('sha256').update(data.password).digest('hex');
-
-            if (data.role === 'player') {
-                // Insert into players table
-                await supabaseInsert('players', {
-                    email: data.email,
-                    password_hash: pwHash,
-                    first_name: data.firstName || '',
-                    last_name: data.lastName || '',
-                    title: data.title || '',
-                    bio: data.bio || '',
-                    github: data.github ? `https://github.com/${data.github}` : null,
-                    linkedin: data.linkedin ? `https://linkedin.com/in/${data.linkedin}` : null,
-                    discord: data.discord || null,
-                    website: data.website || null,
-                    skills: data.skills || null,
-                    team_status: data.teamStatus || 'solo',
-                    verified: true,
-                    created_at: new Date().toISOString()
-                });
-            } else {
-                // Insert into admins table
-                await supabaseInsert('admins', {
-                    email: data.email,
-                    password_hash: pwHash,
-                    first_name: data.firstName || '',
-                    last_name: data.lastName || '',
-                    organization: data.organization || '',
-                    role_title: data.adminRole || '',
-                    verified: true,
-                    created_at: new Date().toISOString()
-                });
-
-                // If event details provided, insert into events table
-                if (data.eventName) {
-                    await supabaseInsert('events', {
-                        organizer_email: data.email,
-                        name: data.eventName,
-                        start_time: data.eventStart || null,
-                        end_time: data.eventEnd || null,
-                        location: data.eventLocation || null,
-                        description: data.eventDesc || null,
-                        ticket_price: data.eventPrice || 'free',
-                        capacity: data.eventCapacity || 'unlimited',
-                        requires_approval: data.eventApproval === true,
-                        created_at: new Date().toISOString()
-                    });
-                }
-            }
-
-            // Redirect to success page
-            setCORS(res);
-            res.writeHead(302, { Location: `${BASE_URL}/auth.html?verified=1&role=${data.role}` });
-            res.end();
+            const pwHash = hashPassword(data.password);
+            await supabaseInsert('players', {
+                email:         data.email,
+                password_hash: pwHash,
+                first_name:    data.firstName  || '',
+                last_name:     data.lastName   || '',
+                title:         data.title      || '',
+                bio:           data.bio        || '',
+                github:        data.github     ? 'https://github.com/' + data.github : null,
+                linkedin:      data.linkedin   ? 'https://linkedin.com/in/' + data.linkedin : null,
+                discord:       data.discord    || null,
+                website:       data.website    || null,
+                skills:        data.skills     || null,
+                team_status:   data.teamStatus || 'solo',
+                verified:      true,
+                created_at:    new Date().toISOString()
+            });
+            // ✅ Redirect to login page with success notice
+            setCORS(res); res.writeHead(302, { Location: BASE_URL + '/auth.html?verified=1' }); res.end();
         } catch (err) {
-            console.error('[verify]', err);
-            setCORS(res);
-            res.writeHead(302, { Location: `${BASE_URL}/auth.html?error=db_error` });
-            res.end();
+            console.error('[verify]', err.message);
+            setCORS(res); res.writeHead(302, { Location: BASE_URL + '/auth.html?error=db_error' }); res.end();
         }
         return;
     }
 
-    /* ----------------------------------------------------------
-       POST /api/resend
-       Body: { email, role }
-       ---------------------------------------------------------- */
+    /* POST /api/login */
+    if (pathname === '/api/login' && req.method === 'POST') {
+        try {
+            const body = await parseBody(req);
+            const { email, password } = body;
+            if (!email || !password) return json(res, 400, { error: 'Email and password are required.' });
+
+            const pwHash = hashPassword(password);
+            const rows = await supabaseQuery('players',
+                'email=eq.' + encodeURIComponent(email) +
+                '&password_hash=eq.' + pwHash +
+                '&verified=eq.true&select=email,first_name,last_name'
+            );
+            if (!rows || rows.length === 0) return json(res, 401, { error: 'Invalid email or password.' });
+
+            const user = rows[0];
+            return json(res, 200, { ok: true, user: { email: user.email, firstName: user.first_name, lastName: user.last_name } });
+        } catch (err) {
+            console.error('[login]', err.message);
+            return json(res, 500, { error: 'Login failed. Please try again.' });
+        }
+    }
+
+    /* POST /api/resend */
     if (pathname === '/api/resend' && req.method === 'POST') {
         try {
             const body = await parseBody(req);
-            const { email, role } = body;
-
-            // Find existing pending entry by email
+            const { email } = body;
             let found = null;
             for (const [tok, entry] of pending.entries()) {
-                if (entry.data.email === email) {
-                    found = { tok, entry };
-                    break;
-                }
+                if (entry.data.email === email) { found = { tok, entry }; break; }
             }
-
-            if (!found) {
-                return json(res, 404, { error: 'No pending registration found for this email.' });
-            }
-
-            // Refresh expiry
+            if (!found) return json(res, 404, { error: 'No pending registration found for this email.' });
             found.entry.expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-            const verifyLink = `${BASE_URL}/api/verify?token=${found.tok}`;
-            await transporter.sendMail(buildEmail(email, verifyLink, role || found.entry.data.role));
-
+            const verifyLink = BASE_URL + '/api/verify?token=' + found.tok;
+            await transporter.sendMail(buildEmail(email, verifyLink));
             return json(res, 200, { ok: true });
         } catch (err) {
-            console.error('[resend]', err);
+            console.error('[resend]', err.message);
             return json(res, 500, { error: 'Failed to resend email.' });
         }
     }
 
-    // 404
     json(res, 404, { error: 'Not found' });
 });
 
-server.listen(PORT, () => {
-    console.log(`[EPIC API] Listening on port ${PORT}`);
-});
+server.listen(PORT, () => { console.log('[EPIC API] Listening on port ' + PORT); });

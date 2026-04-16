@@ -14,11 +14,12 @@ let pendingRole  = 'player';
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
 
-    // Coming back from email verification link
+    // Coming back from email verification link — show login tab with success toast
     if (params.get('verified') === '1') {
-        showPanel('panel-success');
-        hideTabs();
-        startCountdown();
+        switchTab('signin');
+        showToast('Email verified! Your account is ready. Please sign in.', 'info');
+        // Pre-clean URL
+        history.replaceState({}, '', window.location.pathname);
         return;
     }
 
