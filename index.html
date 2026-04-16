@@ -834,10 +834,29 @@
     });
 
     // ===== My Profile Modal =====
-    function openProfileModal() {
+    async function openProfileModal() {
         const dd = document.getElementById('user-dropdown');
         if (dd) dd.style.display = 'none';
-        const user = JSON.parse(localStorage.getItem('epic_user') || '{}');
+        const localUser = JSON.parse(localStorage.getItem('epic_user') || '{}');
+        const email = localUser.email;
+        if (!email) return;
+        // Show modal immediately with local data
+        fillProfileModal(localUser);
+        document.getElementById('pm-msg').textContent = '';
+        document.getElementById('profile-modal').style.display = 'flex';
+        // Then fetch latest from server and refresh
+        try {
+            const res = await fetch('/api/profile?email=' + encodeURIComponent(email));
+            if (res.ok) {
+                const fresh = await res.json();
+                // Merge fresh data into localStorage
+                const merged = Object.assign({}, localUser, fresh);
+                localStorage.setItem('epic_user', JSON.stringify(merged));
+                fillProfileModal(merged);
+            }
+        } catch(e) { /* use local data silently */ }
+    }
+    function fillProfileModal(user) {
         document.getElementById('pm-firstname').value   = user.firstName  || '';
         document.getElementById('pm-lastname').value    = user.lastName   || '';
         document.getElementById('pm-email').value       = user.email      || '';
@@ -849,8 +868,6 @@
         document.getElementById('pm-website').value     = user.website    || '';
         document.getElementById('pm-skills').value      = user.skills     || '';
         document.getElementById('pm-team-status').value = user.teamStatus || '';
-        document.getElementById('pm-msg').textContent   = '';
-        document.getElementById('profile-modal').style.display = 'flex';
     }
     function closeProfileModal() {
         document.getElementById('profile-modal').style.display = 'none';
@@ -859,6 +876,11 @@
         const user = JSON.parse(localStorage.getItem('epic_user') || '{}');
         const email = user.email;
         if (!email) return;
+        const firstName = document.getElementById('pm-firstname').value.trim();
+        const lastName  = document.getElementById('pm-lastname').value.trim();
+        const msg = document.getElementById('pm-msg');
+        if (!firstName) { msg.style.color='#f87171'; msg.textContent='First name cannot be empty.'; return; }
+        if (!lastName)  { msg.style.color='#f87171'; msg.textContent='Last name cannot be empty.'; return; }
         const body = {
             email,
             firstName:  document.getElementById('pm-firstname').value.trim(),
@@ -890,15 +912,12 @@
                 document.getElementById('user-display-name').textContent     = body.firstName || fullName;
                 document.getElementById('user-dropdown-avatar').textContent  = initials;
                 document.getElementById('user-dropdown-fullname').textContent = fullName;
-                const msg = document.getElementById('pm-msg');
                 msg.style.color = '#22C55E'; msg.textContent = '✓ Profile saved successfully!';
                 setTimeout(() => closeProfileModal(), 1500);
             } else {
-                const msg = document.getElementById('pm-msg');
                 msg.style.color = '#f87171'; msg.textContent = data.error || 'Failed to save.';
             }
         } catch(e) {
-            const msg = document.getElementById('pm-msg');
             msg.style.color = '#f87171'; msg.textContent = 'Network error. Please try again.';
         }
         btn.disabled = false; btn.textContent = 'Save Changes';
@@ -952,6 +971,9 @@
         }
         if (newPwd !== confirmPwd) {
             msg.style.color='#f87171'; msg.textContent='New passwords do not match.'; return;
+        }
+        if (currentPwd === newPwd) {
+            msg.style.color='#f87171'; msg.textContent='New password must be different from your current password.'; return;
         }
         const btn = document.getElementById('cp-submit-btn');
         btn.disabled = true; btn.textContent = 'Updating...';

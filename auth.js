@@ -488,6 +488,15 @@ async function resendVerification() {
     const btn   = document.getElementById('resend-btn');
     const msgEl = document.getElementById('resend-message');
 
+    if (!pendingEmail) {
+        msgEl.textContent = 'Session expired. Please go back and register again.';
+        msgEl.style.background = 'rgba(248,113,113,0.08)';
+        msgEl.style.borderColor = 'rgba(248,113,113,0.22)';
+        msgEl.style.color = '#fca5a5';
+        msgEl.classList.remove('hidden');
+        return;
+    }
+
     btn.disabled = true;
     btn.textContent = 'Sending...';
     msgEl.classList.add('hidden');
@@ -518,7 +527,7 @@ async function resendVerification() {
     setTimeout(() => {
         btn.disabled = false;
         btn.textContent = 'Resend Email';
-    }, 30000);
+    }, 60000);
 }
 
 /* ============================================================

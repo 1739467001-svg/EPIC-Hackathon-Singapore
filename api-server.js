@@ -205,12 +205,24 @@ const server = http.createServer(async (req, res) => {
             const rows = await supabaseQuery('players',
                 'email=eq.' + encodeURIComponent(email) +
                 '&password_hash=eq.' + pwHash +
-                '&verified=eq.true&select=email,first_name,last_name'
+                '&verified=eq.true&select=email,first_name,last_name,title,bio,github,linkedin,discord,website,skills,team_status'
             );
             if (!rows || rows.length === 0) return json(res, 401, { error: 'Invalid email or password.' });
 
             const user = rows[0];
-            return json(res, 200, { ok: true, user: { email: user.email, firstName: user.first_name, lastName: user.last_name } });
+            return json(res, 200, { ok: true, user: {
+                email:      user.email,
+                firstName:  user.first_name  || '',
+                lastName:   user.last_name   || '',
+                title:      user.title       || '',
+                bio:        user.bio         || '',
+                github:     user.github      || '',
+                linkedin:   user.linkedin    || '',
+                discord:    user.discord     || '',
+                website:    user.website     || '',
+                skills:     user.skills      || '',
+                teamStatus: user.team_status || 'solo'
+            } });
         } catch (err) {
             console.error('[login]', err.message);
             return json(res, 500, { error: 'Login failed. Please try again.' });
@@ -303,10 +315,22 @@ const server = http.createServer(async (req, res) => {
 
             // Fetch user info
             const rows = await supabaseQuery('players',
-                'email=eq.' + encodeURIComponent(email) + '&select=email,first_name,last_name'
+                'email=eq.' + encodeURIComponent(email) + '&select=email,first_name,last_name,title,bio,github,linkedin,discord,website,skills,team_status'
             );
             const user = rows && rows[0] ? rows[0] : { email };
-            return json(res, 200, { ok: true, user: { email: user.email, firstName: user.first_name, lastName: user.last_name } });
+            return json(res, 200, { ok: true, user: {
+                email:      user.email,
+                firstName:  user.first_name  || '',
+                lastName:   user.last_name   || '',
+                title:      user.title       || '',
+                bio:        user.bio         || '',
+                github:     user.github      || '',
+                linkedin:   user.linkedin    || '',
+                discord:    user.discord     || '',
+                website:    user.website     || '',
+                skills:     user.skills      || '',
+                teamStatus: user.team_status || 'solo'
+            } });
         } catch (err) {
             console.error('[verify-otp]', err.message);
             return json(res, 500, { error: 'Verification failed. Please try again.' });
@@ -450,6 +474,11 @@ const server = http.createServer(async (req, res) => {
             if (body.teamStatus !== undefined) update.team_status  = body.teamStatus;
 
             if (Object.keys(update).length === 0) return json(res, 400, { error: 'No fields to update.' });
+            // Validate required fields if provided
+            if (update.first_name !== undefined && !update.first_name.trim())
+                return json(res, 400, { error: 'First name cannot be empty.' });
+            if (update.last_name !== undefined && !update.last_name.trim())
+                return json(res, 400, { error: 'Last name cannot be empty.' });
 
             await supabaseRequest('PATCH',
                 '/rest/v1/players?email=eq.' + encodeURIComponent(email),
@@ -472,6 +501,8 @@ const server = http.createServer(async (req, res) => {
                 return json(res, 400, { error: 'All fields are required.' });
             if (newPassword.length < 8)
                 return json(res, 400, { error: 'New password must be at least 8 characters.' });
+            if (currentPassword === newPassword)
+                return json(res, 400, { error: 'New password must be different from your current password.' });
 
             // Verify current password
             const currentHash = hashPassword(currentPassword);
