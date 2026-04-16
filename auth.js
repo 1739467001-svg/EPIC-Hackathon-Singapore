@@ -14,6 +14,13 @@ let otpCountdownTimer = null;
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
 
+    // Coming back from password reset link
+    const resetToken = params.get('reset_token');
+    if (resetToken) {
+        initResetPassword(resetToken);
+        return;
+    }
+
     // Coming back from email verification link — show login tab with success toast
     if (params.get('verified') === '1') {
         switchTab('signin');
@@ -101,11 +108,127 @@ function togglePassword(inputId, btn) {
 }
 
 /* ============================================================
-   Forgot Password
+   Forgot Password — show panel
    ============================================================ */
-function showForgot(e) {
+function showForgotPanel(e) {
     e.preventDefault();
-    showToast('Password reset is coming soon. Please contact support.', 'info');
+    hideTabs();
+    showPanel('panel-forgot');
+    // Bind form submit if not already bound
+    const form = document.getElementById('form-forgot');
+    if (form && !form._bound) {
+        form.addEventListener('submit', handleForgotPassword);
+        form._bound = true;
+    }
+}
+
+/* ============================================================
+   Forgot Password — send reset email
+   ============================================================ */
+async function handleForgotPassword(e) {
+    e.preventDefault();
+    clearError('forgot-error');
+
+    const email = document.getElementById('forgot-email').value.trim();
+    if (!validateEmail(email)) return showError('forgot-error', 'Please enter a valid email address.');
+
+    setLoading('forgot-submit-btn', true);
+
+    try {
+        const res  = await fetch(`${API_BASE}/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+
+        // Always show success (don't reveal if email exists)
+        document.getElementById('forgot-email-display').textContent = email;
+        showPanel('panel-forgot-sent');
+    } catch {
+        showError('forgot-error', 'Network error. Please check your connection and try again.');
+        setLoading('forgot-submit-btn', false);
+    }
+}
+
+/* ============================================================
+   Reset Password — init from URL token
+   ============================================================ */
+function initResetPassword(token) {
+    hideTabs();
+    showPanel('panel-reset');
+    const form = document.getElementById('form-reset');
+    if (form && !form._bound) {
+        form.addEventListener('submit', (e) => handleResetPassword(e, token));
+        form._bound = true;
+    }
+}
+
+/* ============================================================
+   Reset Password — submit new password
+   ============================================================ */
+async function handleResetPassword(e, token) {
+    e.preventDefault();
+    clearError('reset-error');
+
+    const password = document.getElementById('reset-password').value;
+    const confirm  = document.getElementById('reset-confirm').value;
+
+    if (password.length < 8) return showError('reset-error', 'Password must be at least 8 characters.');
+    if (password !== confirm)  return showError('reset-error', 'Passwords do not match.');
+
+    setLoading('reset-submit-btn', true);
+
+    try {
+        const res  = await fetch(`${API_BASE}/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, password })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            showError('reset-error', data.error || 'Reset failed. The link may have expired.');
+            setLoading('reset-submit-btn', false);
+            return;
+        }
+
+        showPanel('panel-reset-success');
+        history.replaceState({}, '', window.location.pathname);
+    } catch {
+        showError('reset-error', 'Network error. Please check your connection and try again.');
+        setLoading('reset-submit-btn', false);
+    }
+}
+
+/* ============================================================
+   Password Strength Checker
+   ============================================================ */
+function checkPasswordStrength(value) {
+    const fill = document.getElementById('pw-strength-fill');
+    const text = document.getElementById('pw-strength-text');
+    if (!fill || !text) return;
+
+    let score = 0;
+    if (value.length >= 8)  score++;
+    if (value.length >= 12) score++;
+    if (/[A-Z]/.test(value)) score++;
+    if (/[0-9]/.test(value)) score++;
+    if (/[^A-Za-z0-9]/.test(value)) score++;
+
+    const levels = [
+        { pct: '0%',   color: 'transparent',  label: '' },
+        { pct: '25%',  color: '#EF4444',       label: 'Weak' },
+        { pct: '50%',  color: '#F97316',       label: 'Fair' },
+        { pct: '75%',  color: '#EAB308',       label: 'Good' },
+        { pct: '90%',  color: '#22C55E',       label: 'Strong' },
+        { pct: '100%', color: '#16A34A',       label: 'Very strong' },
+    ];
+    const lvl = levels[Math.min(score, 5)];
+    fill.style.width      = lvl.pct;
+    fill.style.background = lvl.color;
+    text.textContent      = lvl.label;
+    text.style.color      = lvl.color;
 }
 
 /* ============================================================

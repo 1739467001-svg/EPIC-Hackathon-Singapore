@@ -30,8 +30,9 @@ const SMTP = {
     }
 };
 
-const pending = new Map();
-const otpStore = new Map(); // email -> { code, expiresAt, attempts }
+const pending  = new Map();
+const otpStore  = new Map(); // email -> { code, expiresAt, attempts }
+const resetStore = new Map(); // token -> { email, expiresAt }
 
 const transporter = nodemailer.createTransport({
     host: SMTP.host,
@@ -309,6 +310,89 @@ const server = http.createServer(async (req, res) => {
         } catch (err) {
             console.error('[verify-otp]', err.message);
             return json(res, 500, { error: 'Verification failed. Please try again.' });
+        }
+    }
+
+    /* POST /api/forgot-password */
+    if (pathname === '/api/forgot-password' && req.method === 'POST') {
+        try {
+            const body  = await parseBody(req);
+            const { email } = body;
+            if (!email) return json(res, 400, { error: 'Email is required.' });
+
+            // Always respond 200 to avoid email enumeration
+            json(res, 200, { ok: true });
+
+            // Check user exists and is verified (async, fire-and-forget)
+            (async () => {
+                try {
+                    const rows = await supabaseQuery('players',
+                        'email=eq.' + encodeURIComponent(email) + '&verified=eq.true&select=email,first_name'
+                    );
+                    if (!rows || rows.length === 0) return; // silently ignore
+
+                    // Generate secure reset token (64 hex chars)
+                    const token     = crypto.randomBytes(32).toString('hex');
+                    const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
+                    resetStore.set(token, { email, expiresAt });
+
+                    const firstName = rows[0].first_name || 'there';
+                    const resetLink = BASE_URL + '/auth.html?reset_token=' + token;
+
+                    const resetHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;"><tr><td style="background:#000;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.07);"><span style="font-size:22px;font-weight:900;color:#fff;">EPIC</span><span style="font-size:13px;color:rgba(255,255,255,0.4);margin-left:12px;">Hackathon Singapore</span></td></tr><tr><td style="padding:36px 36px 28px;"><h1 style="font-size:24px;font-weight:800;color:#fff;margin:0 0 12px;">Reset your password</h1><p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 8px;">Hi ' + firstName + ',</p><p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 28px;">We received a request to reset your EPIC account password. Click the button below to set a new password. This link expires in <strong style="color:#fff;">1 hour</strong>.</p><div style="text-align:center;margin-bottom:28px;"><a href="' + resetLink + '" style="display:inline-block;padding:16px 40px;background:#22C55E;color:#000;font-size:15px;font-weight:700;text-decoration:none;border-radius:12px;">Reset Password</a></div><p style="font-size:13px;color:rgba(255,255,255,0.35);margin:0 0 8px;line-height:1.6;">Or copy and paste this link into your browser:</p><p style="font-size:12px;color:rgba(255,255,255,0.25);word-break:break-all;margin:0;">' + resetLink + '</p></td></tr><tr><td style="background:rgba(255,255,255,0.025);padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);"><p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">If you did not request a password reset, you can safely ignore this email. &copy; 2026 EPIC Hackathon Singapore</p></td></tr></table></td></tr></table></body></html>';
+
+                    await transporter.sendMail({
+                        from: '"EPIC Hackathon Singapore" <' + SMTP.auth.user + '>',
+                        to: email,
+                        subject: 'Reset your EPIC password',
+                        html: resetHtml
+                    });
+                    console.log('[forgot-password] Reset email sent to', email);
+                } catch (err) {
+                    console.error('[forgot-password async]', err.message);
+                }
+            })();
+
+        } catch (err) {
+            console.error('[forgot-password]', err.message);
+            return json(res, 500, { error: 'Server error. Please try again.' });
+        }
+    }
+
+    /* POST /api/reset-password */
+    if (pathname === '/api/reset-password' && req.method === 'POST') {
+        try {
+            const body = await parseBody(req);
+            const { token, password } = body;
+            if (!token || !password) return json(res, 400, { error: 'Token and password are required.' });
+            if (password.length < 8)  return json(res, 400, { error: 'Password must be at least 8 characters.' });
+
+            const entry = resetStore.get(token);
+            if (!entry) return json(res, 400, { error: 'Invalid or expired reset link. Please request a new one.' });
+
+            if (Date.now() > entry.expiresAt) {
+                resetStore.delete(token);
+                return json(res, 400, { error: 'This reset link has expired. Please request a new one.' });
+            }
+
+            const { email } = entry;
+
+            // Hash new password (SHA-256, same as registration)
+            const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
+
+            // Update password in Supabase
+            await supabaseRequest('PATCH',
+                '/rest/v1/players?email=eq.' + encodeURIComponent(email),
+                { password_hash: passwordHash }
+            );
+
+            resetStore.delete(token);
+            console.log('[reset-password] Password updated for', email);
+
+            return json(res, 200, { ok: true, message: 'Password updated successfully.' });
+        } catch (err) {
+            console.error('[reset-password]', err.message);
+            return json(res, 500, { error: 'Failed to reset password. Please try again.' });
         }
     }
 
