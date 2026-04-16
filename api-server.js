@@ -324,6 +324,7 @@ const server = http.createServer(async (req, res) => {
             json(res, 200, { ok: true });
 
             // Check user exists and is verified (async, fire-and-forget)
+            // NOTE: response already sent above, do NOT call json() again after this
             (async () => {
                 try {
                     const rows = await supabaseQuery('players',
@@ -353,6 +354,7 @@ const server = http.createServer(async (req, res) => {
                 }
             })();
 
+            return; // response already sent above
         } catch (err) {
             console.error('[forgot-password]', err.message);
             return json(res, 500, { error: 'Server error. Please try again.' });
