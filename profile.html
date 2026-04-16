@@ -442,16 +442,49 @@
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
+    /* ===== Lang button ===== */
+    .lang-btn {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 7px 14px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 8px;
+        color: rgba(255,255,255,0.7);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: 'Inter', sans-serif;
+    }
+    .lang-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
     /* ===== Responsive ===== */
-    @media (max-width: 600px) {
-        .page { padding: 24px 16px 60px; }
+    @media (max-width: 900px) {
+        .page { padding: 28px 20px 60px; max-width: 100%; }
         .form-grid { grid-template-columns: 1fr; }
-        .card { padding: 20px 18px; }
-        .tabs { width: 100%; }
-        .tab-btn { flex: 1; justify-content: center; padding: 9px 10px; font-size: 13px; }
+    }
+    @media (max-width: 600px) {
+        .page { padding: 20px 14px 60px; }
+        .form-grid { grid-template-columns: 1fr; }
+        .card { padding: 18px 14px; }
+        .tabs { width: 100%; overflow-x: auto; }
+        .tab-btn { flex: 1; justify-content: center; padding: 9px 8px; font-size: 12px; }
         .btn-row { flex-direction: column-reverse; }
-        .btn-save, .btn-cancel { width: 100%; text-align: center; }
-        .header { padding: 0 16px; }
+        .btn-save, .btn-cancel { width: 100%; text-align: center; justify-content: center; }
+        .header { padding: 0 14px; height: 56px; }
+        .header-logo { font-size: 18px; }
+        .back-btn span { display: none; }
+        .lang-btn { padding: 6px 10px; font-size: 12px; }
+        .user-chip span { display: none; }
+        .profile-avatar { width: 64px; height: 64px; font-size: 24px; }
+        .avatar-info h3 { font-size: 16px; }
+        .page-title { font-size: 22px; }
+    }
+    @media (max-width: 400px) {
+        .card { padding: 14px 12px; }
+        .tab-btn { font-size: 11px; padding: 8px 6px; }
     }
     </style>
 </head>
@@ -469,9 +502,10 @@
             <div class="user-chip-avatar" id="hdr-avatar">U</div>
             <span id="hdr-name">User</span>
         </div>
+        <button class="lang-btn" id="profile-lang-btn" onclick="toggleProfileLang()">中文</button>
         <button class="logout-btn" onclick="logout()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            Sign Out
+            <span id="signout-text">Sign Out</span>
         </button>
     </div>
 </header>
@@ -507,25 +541,25 @@
                     <p id="profile-email-display"></p>
                 </div>
             </div>
-            <div class="card-title">Basic Information</div>
-            <div class="card-desc">Update your name, role, and bio.</div>
+            <div class="card-title" data-i18n="basicInfo">Basic Information</div>
+            <div class="card-desc" data-i18n="basicInfoDesc">Update your name, role, and bio.</div>
             <div id="info-error" class="form-error-box"></div>
             <form id="form-info" onsubmit="saveInfo(event)">
                 <div class="form-grid">
                     <div class="form-group">
-                        <label class="form-label">First Name</label>
-                        <input class="form-input" id="p-firstname" type="text" placeholder="First name" autocomplete="given-name">
+                        <label class="form-label" data-i18n="firstName">First Name</label>
+                        <input class="form-input" id="p-firstname" type="text" placeholder="First name" data-i18n-placeholder="firstName" autocomplete="given-name">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Last Name</label>
-                        <input class="form-input" id="p-lastname" type="text" placeholder="Last name" autocomplete="family-name">
+                        <label class="form-label" data-i18n="lastName">Last Name</label>
+                        <input class="form-input" id="p-lastname" type="text" placeholder="Last name" data-i18n-placeholder="lastName" autocomplete="family-name">
                     </div>
                     <div class="form-group full">
-                        <label class="form-label">Email</label>
+                        <label class="form-label" data-i18n="email">Email</label>
                         <input class="form-input" id="p-email" type="email" placeholder="you@example.com" readonly style="opacity:0.5;cursor:not-allowed;">
                     </div>
                     <div class="form-group full">
-                        <label class="form-label">Role / Title</label>
+                        <label class="form-label" data-i18n="role">Role / Title</label>
                         <select class="form-select" id="p-role">
                             <option value="">Select your role</option>
                             <option value="Developer">Developer</option>
@@ -540,12 +574,12 @@
                         </select>
                     </div>
                     <div class="form-group full">
-                        <label class="form-label">Bio</label>
-                        <textarea class="form-textarea" id="p-bio" placeholder="Tell others about yourself, your background, and what you're building..." rows="4"></textarea>
+                        <label class="form-label" data-i18n="bio">Bio</label>
+                        <textarea class="form-textarea" id="p-bio" placeholder="Tell others about yourself, your background, and what you're building..." data-i18n-placeholder="bioPlaceholder" rows="4"></textarea>
                     </div>
                 </div>
                 <div class="btn-row">
-                    <button type="submit" class="btn-save" id="btn-save-info">Save Changes</button>
+                    <button type="submit" class="btn-save" id="btn-save-info" data-i18n="saveInfo">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -554,38 +588,38 @@
     <!-- Tab: Links & Skills -->
     <div class="tab-panel" id="panel-links">
         <div class="card">
-            <div class="card-title">Social Links</div>
-            <div class="card-desc">Connect your profiles so teammates can find you.</div>
+            <div class="card-title" data-i18n="linksTitle">Social Links</div>
+            <div class="card-desc" data-i18n="linksDesc">Connect your profiles so teammates can find you.</div>
             <div id="links-error" class="form-error-box"></div>
             <form id="form-links" onsubmit="saveLinks(event)">
                 <div class="form-grid single">
                     <div class="form-group">
-                        <label class="form-label">GitHub</label>
+                        <label class="form-label" data-i18n="github">GitHub</label>
                         <div class="input-wrap">
                             <span class="input-prefix">github.com/</span>
                             <input class="form-input" id="p-github" type="text" placeholder="yourusername">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">LinkedIn</label>
+                        <label class="form-label" data-i18n="linkedin">LinkedIn</label>
                         <div class="input-wrap">
                             <span class="input-prefix">linkedin.com/in/</span>
                             <input class="form-input" id="p-linkedin" type="text" placeholder="yourusername">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Discord</label>
+                        <label class="form-label" data-i18n="discord">Discord</label>
                         <div class="input-wrap">
                             <span class="input-prefix" style="font-size:16px;">⌗</span>
                             <input class="form-input" id="p-discord" type="text" placeholder="username#1234 or username">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Personal Website</label>
+                        <label class="form-label" data-i18n="website">Personal Website</label>
                         <input class="form-input" id="p-website" type="url" placeholder="https://yoursite.com">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Skills</label>
+                        <label class="form-label" data-i18n="skills">Skills</label>
                         <div class="skills-input-wrap" id="skills-wrap" onclick="document.getElementById('skills-input').focus()">
                             <!-- skill tags injected here -->
                             <input class="skills-text-input" id="skills-input" placeholder="Type a skill and press Enter..." autocomplete="off">
@@ -593,7 +627,7 @@
                         <div class="skills-hint">Press Enter or comma to add a skill tag</div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Team Status</label>
+                        <label class="form-label" data-i18n="teamStatus">Team Status</label>
                         <select class="form-select" id="p-team-status">
                             <option value="solo">Solo — not looking for team</option>
                             <option value="looking">Looking for teammates</option>
@@ -603,7 +637,7 @@
                     </div>
                 </div>
                 <div class="btn-row">
-                    <button type="submit" class="btn-save" id="btn-save-links">Save Changes</button>
+                    <button type="submit" class="btn-save" id="btn-save-links" data-i18n="saveLinks">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -612,13 +646,13 @@
     <!-- Tab: Security -->
     <div class="tab-panel" id="panel-security">
         <div class="card">
-            <div class="card-title">Change Password</div>
-            <div class="card-desc">Choose a strong password to keep your account secure.</div>
+            <div class="card-title" data-i18n="securityTitle">Change Password</div>
+            <div class="card-desc" data-i18n="securityDesc">Choose a strong password to keep your account secure.</div>
             <div id="security-error" class="form-error-box"></div>
             <form id="form-security" onsubmit="changePassword(event)">
                 <div class="form-grid single">
                     <div class="form-group">
-                        <label class="form-label">Current Password</label>
+                        <label class="form-label" data-i18n="currentPassword">Current Password</label>
                         <div class="pw-wrap">
                             <input class="form-input" id="p-current-pw" type="password" placeholder="Enter current password" autocomplete="current-password">
                             <button type="button" class="pw-toggle" onclick="togglePw('p-current-pw', this)">
@@ -627,7 +661,7 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">New Password</label>
+                        <label class="form-label" data-i18n="newPassword">New Password</label>
                         <div class="pw-wrap">
                             <input class="form-input" id="p-new-pw" type="password" placeholder="At least 8 characters" autocomplete="new-password" oninput="checkPwStrength(this.value)">
                             <button type="button" class="pw-toggle" onclick="togglePw('p-new-pw', this)">
@@ -638,7 +672,7 @@
                         <div class="pw-strength-text" id="pw-strength-text"></div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Confirm New Password</label>
+                        <label class="form-label" data-i18n="confirmPassword">Confirm New Password</label>
                         <div class="pw-wrap">
                             <input class="form-input" id="p-confirm-pw" type="password" placeholder="Repeat new password" autocomplete="new-password">
                             <button type="button" class="pw-toggle" onclick="togglePw('p-confirm-pw', this)">
@@ -648,7 +682,7 @@
                     </div>
                 </div>
                 <div class="btn-row">
-                    <button type="submit" class="btn-save" id="btn-save-pw">Update Password</button>
+                    <button type="submit" class="btn-save" id="btn-save-pw" data-i18n="savePassword">Update Password</button>
                 </div>
             </form>
         </div>
@@ -990,8 +1024,145 @@ function hideError(id) {
 // ===== Logout =====
 function logout() {
     localStorage.removeItem('epic_user');
+    sessionStorage.clear();
+    document.cookie.split(';').forEach(c => {
+        document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+    });
     window.location.href = 'auth.html';
 }
+
+// ===== Profile Page i18n =====
+const profileI18n = {
+    en: {
+        backToHome: 'Back to Home',
+        signOut: 'Sign Out',
+        pageTitle: 'My Profile',
+        pageSubtitle: 'Manage your personal information and account settings.',
+        tabInfo: 'Personal Info',
+        tabLinks: 'Links & Skills',
+        tabSecurity: 'Security',
+        basicInfo: 'Basic Information',
+        basicInfoDesc: 'Update your name, role, and bio.',
+        firstName: 'First Name',
+        lastName: 'Last Name',
+        email: 'Email',
+        role: 'Role / Title',
+        bio: 'Bio',
+        bioPlaceholder: 'Tell others about yourself...',
+        saveInfo: 'Save Changes',
+        cancel: 'Cancel',
+        linksTitle: 'Links & Social',
+        linksDesc: 'Add your social profiles and portfolio links.',
+        github: 'GitHub',
+        linkedin: 'LinkedIn',
+        discord: 'Discord',
+        website: 'Website',
+        skillsTitle: 'Skills & Team',
+        skillsDesc: 'Add your skills and set your team status.',
+        skills: 'Skills',
+        skillsPlaceholder: 'Type a skill and press Enter...',
+        skillsHint: 'Press Enter or comma to add a skill',
+        teamStatus: 'Team Status',
+        saveLinks: 'Save Changes',
+        securityTitle: 'Change Password',
+        securityDesc: 'Update your password to keep your account secure.',
+        currentPassword: 'Current Password',
+        newPassword: 'New Password',
+        confirmPassword: 'Confirm New Password',
+        savePassword: 'Update Password',
+    },
+    zh: {
+        backToHome: '返回首页',
+        signOut: '退出登录',
+        pageTitle: '个人中心',
+        pageSubtitle: '管理您的个人信息和账号设置。',
+        tabInfo: '个人信息',
+        tabLinks: '链接与技能',
+        tabSecurity: '安全设置',
+        basicInfo: '基本信息',
+        basicInfoDesc: '更新您的姓名、角色和个人简介。',
+        firstName: '名',
+        lastName: '姓',
+        email: '邮箱',
+        role: '角色 / 职位',
+        bio: '个人简介',
+        bioPlaceholder: '向大家介绍一下自己...',
+        saveInfo: '保存修改',
+        cancel: '取消',
+        linksTitle: '链接与社交',
+        linksDesc: '添加您的社交资料和作品集链接。',
+        github: 'GitHub',
+        linkedin: 'LinkedIn',
+        discord: 'Discord',
+        website: '个人网站',
+        skillsTitle: '技能与团队',
+        skillsDesc: '添加您的技能并设置组队状态。',
+        skills: '技能标签',
+        skillsPlaceholder: '输入技能名称，按 Enter 添加...',
+        skillsHint: '按 Enter 或逗号添加技能',
+        teamStatus: '组队状态',
+        saveLinks: '保存修改',
+        securityTitle: '修改密码',
+        securityDesc: '更新您的密码以保持账号安全。',
+        currentPassword: '当前密码',
+        newPassword: '新密码',
+        confirmPassword: '确认新密码',
+        savePassword: '更新密码',
+    }
+};
+
+let profileLang = localStorage.getItem('epic_lang') || 'en';
+
+function applyProfileLang(lang) {
+    profileLang = lang;
+    localStorage.setItem('epic_lang', lang);
+    const t = profileI18n[lang];
+    const btn = document.getElementById('profile-lang-btn');
+    if (btn) btn.textContent = lang === 'en' ? '中文' : 'EN';
+
+    // Header
+    const backBtn = document.querySelector('.back-btn');
+    if (backBtn) backBtn.lastChild.textContent = ' ' + t.backToHome;
+    const signoutText = document.getElementById('signout-text');
+    if (signoutText) signoutText.textContent = t.signOut;
+
+    // Page
+    const pageTitle = document.querySelector('.page-title');
+    if (pageTitle) pageTitle.textContent = t.pageTitle;
+    const pageSub = document.querySelector('.page-subtitle');
+    if (pageSub) pageSub.textContent = t.pageSubtitle;
+
+    // Tabs
+    const tabInfo = document.getElementById('tab-info');
+    if (tabInfo) tabInfo.lastChild.textContent = ' ' + t.tabInfo;
+    const tabLinks = document.getElementById('tab-links');
+    if (tabLinks) tabLinks.lastChild.textContent = ' ' + t.tabLinks;
+    const tabSec = document.getElementById('tab-security');
+    if (tabSec) tabSec.lastChild.textContent = ' ' + t.tabSecurity;
+
+    // Labels - use data-i18n attributes
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (t[key]) el.textContent = t[key];
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (t[key]) el.placeholder = t[key];
+    });
+}
+
+function toggleProfileLang() {
+    applyProfileLang(profileLang === 'en' ? 'zh' : 'en');
+}
+
+// Apply on load
+document.addEventListener('DOMContentLoaded', function() {
+    if (profileLang === 'zh') applyProfileLang('zh');
+    else {
+        const btn = document.getElementById('profile-lang-btn');
+        if (btn) btn.textContent = '中文';
+    }
+});
 </script>
 </body>
 </html>

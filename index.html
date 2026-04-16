@@ -160,6 +160,30 @@
         </div>
     </header>
 
+    <!-- Mobile Navigation Overlay -->
+    <div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="closeMobileNav()"></div>
+    <div class="mobile-nav-panel" id="mobileNavPanel">
+        <div class="mobile-nav-header">
+            <span style="font-size:20px;font-weight:800;color:#fff;">EPIC</span>
+            <button class="mobile-nav-close" onclick="closeMobileNav()">&#x2715;</button>
+        </div>
+        <div class="mobile-nav-links">
+            <a href="#about"    class="mobile-nav-link" onclick="closeMobileNav()" data-i18n="nav.about">About</a>
+            <a href="#schedule" class="mobile-nav-link" onclick="closeMobileNav()" data-i18n="nav.schedule">Schedule</a>
+            <a href="#prizes"   class="mobile-nav-link" onclick="closeMobileNav()" data-i18n="nav.prizes">Prizes</a>
+            <a href="#team"     class="mobile-nav-link" onclick="closeMobileNav()" data-i18n="nav.team">Team Up</a>
+            <a href="#sponsors" class="mobile-nav-link" onclick="closeMobileNav()" data-i18n="nav.sponsors">Sponsors</a>
+        </div>
+        <div class="mobile-nav-divider"></div>
+        <div class="mobile-nav-footer">
+            <a href="auth.html" class="btn btn-primary btn-full" id="mobile-register-btn">Register Now</a>
+            <div class="mobile-lang-row">
+                <button class="mobile-lang-btn active" id="mobile-lang-en" onclick="setMobileLang('en')">EN</button>
+                <button class="mobile-lang-btn" id="mobile-lang-zh" onclick="setMobileLang('zh')">中文</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Hero Section -->
     <section class="hero" id="about">
         <div class="hero-background">
@@ -1119,5 +1143,75 @@
         </div>
       </div>
     </div>
+
+    <script>
+    // ===== Mobile Navigation =====
+    (function() {
+        const toggle = document.getElementById('menuToggle');
+        if (toggle) {
+            toggle.addEventListener('click', function() {
+                document.getElementById('mobileNavPanel').classList.add('open');
+                document.getElementById('mobileNavOverlay').classList.add('open');
+                document.body.style.overflow = 'hidden';
+            });
+        }
+    })();
+
+    function closeMobileNav() {
+        document.getElementById('mobileNavPanel').classList.remove('open');
+        document.getElementById('mobileNavOverlay').classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    function setMobileLang(lang) {
+        // Sync with desktop lang system
+        if (typeof currentLang !== 'undefined') {
+            currentLang = lang;
+            if (typeof updateLanguage === 'function') updateLanguage();
+            if (typeof updateLangUI === 'function') updateLangUI();
+        }
+        // Update mobile buttons
+        document.getElementById('mobile-lang-en').classList.toggle('active', lang === 'en');
+        document.getElementById('mobile-lang-zh').classList.toggle('active', lang === 'zh');
+        // Update mobile nav link texts
+        const t = (typeof i18n !== 'undefined') ? i18n[lang] : null;
+        if (t) {
+            const links = document.querySelectorAll('.mobile-nav-link[data-i18n]');
+            links.forEach(link => {
+                const key = link.getAttribute('data-i18n');
+                const parts = key.split('.');
+                let val = t;
+                parts.forEach(p => { val = val && val[p]; });
+                if (val) link.textContent = val;
+            });
+            const mRegBtn = document.getElementById('mobile-register-btn');
+            if (mRegBtn) mRegBtn.textContent = t.nav.register;
+        }
+        localStorage.setItem('epic_lang', lang);
+    }
+
+    // Sync mobile lang buttons with saved preference on load
+    (function() {
+        const saved = localStorage.getItem('epic_lang') || 'en';
+        const enBtn = document.getElementById('mobile-lang-en');
+        const zhBtn = document.getElementById('mobile-lang-zh');
+        if (enBtn) enBtn.classList.toggle('active', saved === 'en');
+        if (zhBtn) zhBtn.classList.toggle('active', saved === 'zh');
+        if (saved === 'zh') {
+            // Update mobile nav link texts
+            const t = (typeof i18n !== 'undefined') ? i18n['zh'] : null;
+            if (t) {
+                const links = document.querySelectorAll('.mobile-nav-link[data-i18n]');
+                links.forEach(link => {
+                    const key = link.getAttribute('data-i18n');
+                    const parts = key.split('.');
+                    let val = t;
+                    parts.forEach(p => { val = val && val[p]; });
+                    if (val) link.textContent = val;
+                });
+            }
+        }
+    })();
+    </script>
 </body>
 </html>

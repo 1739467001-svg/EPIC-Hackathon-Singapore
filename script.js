@@ -344,7 +344,7 @@ const i18n = {
 };
 
 // State
-let currentLang = 'en';
+let currentLang = localStorage.getItem('epic_lang') || 'en';
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -353,6 +353,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initScrollReveal();
     initSmoothScroll();
+    // Apply saved language on load
+    if (currentLang !== 'en') {
+        updateLanguage();
+        updateLangUI();
+    }
 });
 
 /**
@@ -390,51 +395,151 @@ function initLanguageSwitch() {
     langOptions.forEach(option => {
         option.addEventListener('click', () => {
             const lang = option.dataset.lang;
-            if (lang !== currentLang) {
-                currentLang = lang;
-                updateLanguage();
-                updateLangUI();
-            }
+            currentLang = lang;
+            updateLanguage();
+            updateLangUI();
             langDropdown.classList.remove('show');
         });
+    });
+    // Also support direct toggle click (EN ↔ 中文 without dropdown)
+    langToggle.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        currentLang = currentLang === 'en' ? 'zh' : 'en';
+        updateLanguage();
+        updateLangUI();
+        langDropdown.classList.remove('show');
     });
 }
 
 function updateLanguage() {
-    const texts = i18n[currentLang];
-    
-    // Update nav
+    const t = i18n[currentLang];
+    localStorage.setItem('epic_lang', currentLang);
+
+    // ── Nav links ──
     document.querySelectorAll('.nav-link').forEach((el, i) => {
         const keys = ['about', 'schedule', 'prizes', 'team', 'sponsors'];
-        if (keys[i]) el.textContent = texts.nav[keys[i]];
+        if (keys[i]) el.textContent = t.nav[keys[i]];
     });
-    
-    document.querySelector('.header-actions .btn-primary').textContent = texts.nav.register;
-    
-    // Update hero
-    document.querySelector('.hero-badge').innerHTML = `<span class="badge-pulse"></span>${texts.hero.badge}`;
-    document.querySelector('.hero-title').innerHTML = `${texts.hero.title}<br><span class="title-highlight">${texts.hero.subtitle}</span>`;
-    document.querySelector('.hero-description').textContent = texts.hero.description;
-    
+    // Register button (guest) — safe selector
+    const regBtn = document.getElementById('nav-register-btn');
+    if (regBtn) regBtn.textContent = t.nav.register;
+    // User dropdown items
+    const ddItems = document.querySelectorAll('.user-dropdown-item');
+    if (ddItems[0]) ddItems[0].childNodes[ddItems[0].childNodes.length-1].textContent = (currentLang==='zh'?' 我的主页':' My Profile');
+    if (ddItems[1]) ddItems[1].childNodes[ddItems[1].childNodes.length-1].textContent = (currentLang==='zh'?' 修改密码':' Change Password');
+    if (ddItems[2]) ddItems[2].childNodes[ddItems[2].childNodes.length-1].textContent = (currentLang==='zh'?' 退出登录':' Sign Out');
+
+    // ── Hero ──
+    document.querySelector('.hero-badge').innerHTML = `<span class="badge-pulse"></span>${t.hero.badge}`;
+    document.querySelector('.hero-title').innerHTML = `${t.hero.title}<br><span class="title-highlight">${t.hero.subtitle}</span>`;
+    document.querySelector('.hero-description').textContent = t.hero.description;
     const statLabels = document.querySelectorAll('.stat-label');
-    statLabels[0].textContent = texts.hero.prize;
-    statLabels[1].textContent = texts.hero.founders;
-    statLabels[2].textContent = texts.hero.duration;
-    
-    const ctaButtons = document.querySelectorAll('.hero-cta .btn');
-    ctaButtons[0].textContent = texts.hero.ctaPrimary;
-    ctaButtons[1].textContent = texts.hero.ctaSecondary;
-    
+    if (statLabels[0]) statLabels[0].textContent = t.hero.prize;
+    if (statLabels[1]) statLabels[1].textContent = t.hero.founders;
+    if (statLabels[2]) statLabels[2].textContent = t.hero.duration;
+    const ctaBtns = document.querySelectorAll('.hero-cta .btn');
+    if (ctaBtns[0]) ctaBtns[0].textContent = t.hero.ctaPrimary;
+    if (ctaBtns[1]) ctaBtns[1].textContent = t.hero.ctaSecondary;
     const infoItems = document.querySelectorAll('.info-item span');
-    infoItems[0].textContent = texts.hero.location;
-    infoItems[1].textContent = texts.hero.date;
-    
-    // Update sections (simplified - full implementation would update all text)
-    updateSection('resources', texts.resources);
-    updateSection('team', texts.team);
-    updateSection('schedule', texts.schedule);
-    updateSection('prizes', texts.prizes);
-    updateSection('cta', texts.cta);
+    if (infoItems[0]) infoItems[0].textContent = t.hero.location;
+    if (infoItems[1]) infoItems[1].textContent = t.hero.date;
+
+    // ── Resources section ──
+    const rSec = document.getElementById('resources');
+    if (rSec) {
+        const ey = rSec.querySelector('.section-eyebrow'); if(ey) ey.textContent = t.resources.eyebrow;
+        const ti = rSec.querySelector('.section-title');   if(ti) ti.textContent = t.resources.title;
+        const de = rSec.querySelector('.section-description'); if(de) de.textContent = t.resources.description;
+        const cards = rSec.querySelectorAll('.resource-card');
+        const rKeys = ['ai','cloud','mentor','growth'];
+        cards.forEach((card, i) => {
+            if (!rKeys[i]) return;
+            const h3 = card.querySelector('.resource-title'); if(h3) h3.textContent = t.resources[rKeys[i]].title;
+            const p  = card.querySelector('.resource-desc');  if(p)  p.textContent  = t.resources[rKeys[i]].desc;
+        });
+    }
+
+    // ── Team section ──
+    const tSec = document.getElementById('team');
+    if (tSec) {
+        const ey = tSec.querySelector('.section-eyebrow'); if(ey) ey.textContent = t.team.eyebrow;
+        const ti = tSec.querySelector('.section-title');   if(ti) ti.textContent = t.team.title;
+        const de = tSec.querySelector('.section-description'); if(de) de.textContent = t.team.description;
+        // Tab buttons
+        const tabBtns = tSec.querySelectorAll('.tab-btn');
+        const tabKeys = ['find','create','browse'];
+        tabBtns.forEach((btn,i) => { if(tabKeys[i]) btn.textContent = t.team.tabs[tabKeys[i]]; });
+        // Filter labels
+        const filterLabels = tSec.querySelectorAll('.filter-group label');
+        const fKeys = ['role','experience','location'];
+        filterLabels.forEach((lbl,i) => { if(fKeys[i]) lbl.textContent = t.team.filters[fKeys[i]]; });
+        // Create team form
+        const formLabels = tSec.querySelectorAll('.create-team-form .form-group label');
+        const formKeys = ['teamName','lookingFor','teamSize','idea'];
+        formLabels.forEach((lbl,i) => { if(formKeys[i]) lbl.textContent = t.team.form[formKeys[i]]; });
+        const textarea = tSec.querySelector('.form-textarea');
+        if (textarea) textarea.placeholder = t.team.form.placeholder;
+        const createBtn = tSec.querySelector('.create-team-form .btn-large');
+        if (createBtn) createBtn.textContent = t.team.form.create;
+    }
+
+    // ── Schedule section ──
+    const sSec = document.getElementById('schedule');
+    if (sSec) {
+        const ey = sSec.querySelector('.section-eyebrow'); if(ey) ey.textContent = t.schedule.eyebrow;
+        const ti = sSec.querySelector('.section-title');   if(ti) ti.textContent = t.schedule.title;
+        const de = sSec.querySelector('.section-description'); if(de) de.textContent = t.schedule.description;
+        const items = sSec.querySelectorAll('.timeline-item');
+        const dKeys = ['day1','day2','day3'];
+        items.forEach((item, i) => {
+            if (!dKeys[i]) return;
+            const d = t.schedule[dKeys[i]];
+            const dayEl   = item.querySelector('.timeline-day');  if(dayEl)  dayEl.textContent  = d.day;
+            const dateEl  = item.querySelector('.timeline-date'); if(dateEl) dateEl.textContent = d.date;
+            const titleEl = item.querySelector('h3');             if(titleEl) titleEl.textContent = d.title;
+            const lis = item.querySelectorAll('.timeline-list li');
+            lis.forEach((li, j) => { if(d.items[j]) li.textContent = d.items[j]; });
+        });
+    }
+
+    // ── Prizes section ──
+    const pSec = document.getElementById('prizes');
+    if (pSec) {
+        const ey = pSec.querySelector('.section-eyebrow'); if(ey) ey.textContent = t.prizes.eyebrow;
+        const ti = pSec.querySelector('.section-title');   if(ti) ti.textContent = t.prizes.title;
+        const de = pSec.querySelector('.section-description'); if(de) de.textContent = t.prizes.description;
+        const ranks = pSec.querySelectorAll('.prize-rank');
+        const rankKeys = ['grand','second','third','aiAgent','design','community'];
+        ranks.forEach((r,i) => { if(rankKeys[i]) r.textContent = t.prizes[rankKeys[i]]; });
+        const prizeItems = pSec.querySelectorAll('.prize-includes li');
+        prizeItems.forEach((li, i) => { if(t.prizes.includes[i]) li.textContent = t.prizes.includes[i]; });
+    }
+
+    // ── CTA section ──
+    const ctaSec = document.querySelector('.cta-section') || document.querySelector('section.section:last-of-type');
+    if (ctaSec) {
+        const ctaTitle = ctaSec.querySelector('.cta-title'); if(ctaTitle) ctaTitle.textContent = t.cta.title;
+        const ctaDesc  = ctaSec.querySelector('.cta-description'); if(ctaDesc) ctaDesc.textContent = t.cta.description;
+        const ctaNote  = ctaSec.querySelector('.price-note'); if(ctaNote) ctaNote.textContent = t.cta.note;
+        const ctaBtn   = ctaSec.querySelector('.btn-large.btn-primary'); if(ctaBtn) ctaBtn.textContent = t.cta.button;
+        const guarantee = ctaSec.querySelector('.cta-guarantee'); if(guarantee) guarantee.textContent = t.cta.guarantee;
+        const priceCurrent = ctaSec.querySelector('.price-current'); if(priceCurrent) priceCurrent.textContent = t.cta.current;
+    }
+
+    // ── Footer ──
+    const footer = document.querySelector('footer');
+    if (footer) {
+        const tagline = footer.querySelector('.footer-tagline'); if(tagline) tagline.textContent = t.footer.tagline;
+        const copyright = footer.querySelector('.footer-copyright'); if(copyright) copyright.textContent = '© ' + t.footer.copyright;
+        // Footer section headings
+        const footerHeadings = footer.querySelectorAll('.footer-heading');
+        const headingKeys = ['hackathon','resources','company'];
+        footerHeadings.forEach((h,i) => { if(headingKeys[i]) h.textContent = t.footer[headingKeys[i]]; });
+        // Footer links
+        const footerLinks = footer.querySelectorAll('.footer-link');
+        const linkKeys = ['about','schedule','prizes','team','aiTools','cloud','mentors','faq','aboutEpic','partners','sponsor','contact'];
+        footerLinks.forEach((a,i) => { if(linkKeys[i] && t.footer.links[linkKeys[i]]) a.textContent = t.footer.links[linkKeys[i]]; });
+    }
 }
 
 function updateSection(id, texts) {
@@ -452,11 +557,8 @@ function updateSection(id, texts) {
 
 function updateLangUI() {
     const langText = document.querySelector('.lang-text');
-    const langOptions = document.querySelectorAll('.lang-option');
-    
-    langText.textContent = currentLang.toUpperCase();
-    
-    langOptions.forEach(option => {
+    if (langText) langText.textContent = currentLang === 'zh' ? '中文' : 'EN';
+    document.querySelectorAll('.lang-option').forEach(option => {
         option.classList.toggle('active', option.dataset.lang === currentLang);
     });
 }

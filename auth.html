@@ -608,6 +608,31 @@ input, select { font-family: inherit; }
     text-align: right;
 }
 
+/* Language toggle button */
+.auth-lang-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    color: rgba(255,255,255,0.8);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+.auth-lang-btn:hover {
+    background: rgba(255,255,255,0.14);
+    color: #fff;
+}
+
 /* ============================================================
    RESPONSIVE
    ============================================================ */
@@ -616,27 +641,38 @@ input, select { font-family: inherit; }
         grid-template-columns: 1fr;
         grid-template-rows: auto 1fr;
     }
-
     .auth-left-inner {
         min-height: auto;
-        padding: 32px 28px 36px;
+        padding: 32px 24px 36px;
     }
-
     .auth-left-brand { padding: 28px 0 20px; }
-
-    .auth-left-headline { font-size: 32px; letter-spacing: -1.5px; }
-
+    .auth-left-headline { font-size: 30px; letter-spacing: -1.5px; }
+    .auth-left-desc { font-size: 14px; }
     .auth-right {
         min-height: auto;
-        padding: 40px 28px 56px;
+        padding: 36px 24px 56px;
     }
-
-    .auth-stats-card { padding: 20px 20px; }
-    .auth-stat-value { font-size: 18px; }
+    .auth-stats-card { padding: 18px 16px; }
+    .auth-stat-value { font-size: 17px; }
+    .auth-field-row { grid-template-columns: 1fr; }
+    .auth-lang-btn { top: 12px; right: 12px; padding: 7px 12px; font-size: 12px; }
+}
+@media (max-width: 480px) {
+    .auth-layout { min-height: 100svh; }
+    .auth-left-inner { padding: 24px 18px 28px; }
+    .auth-left-headline { font-size: 26px; }
+    .auth-right { padding: 28px 18px 48px; }
+    .auth-panel-title { font-size: 22px; }
+    .auth-submit-btn { padding: 13px 20px; font-size: 14px; }
+    .otp-send-row { grid-template-columns: 1fr; }
+    .otp-send-btn { width: 100%; }
 }
     </style>
 </head>
 <body>
+
+<!-- Language toggle button -->
+<button class="auth-lang-btn" id="auth-lang-btn" onclick="applyAuthLang(authLang === 'en' ? 'zh' : 'en')">中文</button>
 
 <div class="auth-layout">
 
@@ -963,5 +999,229 @@ input, select { font-family: inherit; }
 </div>
 
 <script src="auth.js?v=4"></script>
+<script>
+// ===== Auth Page i18n =====
+const authI18n = {
+    en: {
+        backToEpic: 'Back to EPIC',
+        headline1: 'Build the future',
+        headline2: 'in 48 hours.',
+        desc: "Join 200+ global founders, developers, and designers at Singapore's premier AI hackathon.",
+        prizeLabel: 'PRIZE\nPOOL',
+        foundersLabel: 'FOUNDERS',
+        dateLabel: 'SINGAPORE',
+        tabSignin: 'Sign In',
+        tabSignup: 'Create Account',
+        welcomeBack: 'Welcome back',
+        signInSubtitle: 'Sign in to your EPIC account',
+        passwordLogin: 'Password Login',
+        emailOTP: 'Email OTP',
+        emailPlaceholder: 'you@example.com',
+        passwordPlaceholder: 'Enter your password',
+        forgotPassword: 'Forgot password?',
+        signInBtn: 'Sign In',
+        signingIn: 'Signing in...',
+        noAccount: "Don't have an account?",
+        createOne: 'Create one',
+        sendCode: 'Send Code',
+        verifySignIn: 'Verify & Sign In',
+        verifying: 'Verifying...',
+        useDifferentEmail: 'Use a different email',
+        createAccount: 'Create account',
+        joinEpic: 'Join EPIC Hackathon Singapore',
+        firstName: 'First name',
+        lastName: 'Last name',
+        selectRole: 'Select your role',
+        createAccountBtn: 'Create Account',
+        creatingAccount: 'Creating account...',
+        alreadyHave: 'Already have an account?',
+        signIn: 'Sign in',
+        checkEmail: 'Check your email',
+        sentVerification: "We've sent a verification link to",
+        resendEmail: 'Resend Email',
+        backToHome: 'Back to Home',
+        resetPassword: 'Reset password',
+        resetSubtitle: "Enter your email and we'll send you a reset link.",
+        sendResetLink: 'Send Reset Link',
+        sending: 'Sending...',
+        backToSignIn: 'Back to Sign In',
+        setNewPassword: 'Set new password',
+        newPasswordPlaceholder: 'New password (min. 8 chars)',
+        confirmPasswordPlaceholder: 'Confirm new password',
+        updatePassword: 'Update Password',
+        updating: 'Updating...',
+        passwordUpdated: 'Password updated!',
+        passwordUpdatedSub: 'Your password has been successfully reset. You can now sign in with your new password.',
+        signInNow: 'Sign In Now',
+    },
+    zh: {
+        backToEpic: '返回 EPIC',
+        headline1: '构建未来',
+        headline2: '只需 48 小时。',
+        desc: '加入 200+ 位全球创始人、开发者和设计师，共赴新加坡顶级 AI 黑客松。',
+        prizeLabel: '奖金\n总额',
+        foundersLabel: '参赛者',
+        dateLabel: '新加坡',
+        tabSignin: '登录',
+        tabSignup: '创建账号',
+        welcomeBack: '欢迎回来',
+        signInSubtitle: '登录您的 EPIC 账号',
+        passwordLogin: '密码登录',
+        emailOTP: '邮箱验证码',
+        emailPlaceholder: '您的邮箱',
+        passwordPlaceholder: '输入密码',
+        forgotPassword: '忘记密码？',
+        signInBtn: '登录',
+        signingIn: '登录中...',
+        noAccount: '还没有账号？',
+        createOne: '立即注册',
+        sendCode: '发送验证码',
+        verifySignIn: '验证并登录',
+        verifying: '验证中...',
+        useDifferentEmail: '使用其他邮箱',
+        createAccount: '创建账号',
+        joinEpic: '加入 EPIC 黑客松新加坡',
+        firstName: '名',
+        lastName: '姓',
+        selectRole: '选择您的角色',
+        createAccountBtn: '创建账号',
+        creatingAccount: '创建中...',
+        alreadyHave: '已有账号？',
+        signIn: '立即登录',
+        checkEmail: '查看您的邮件',
+        sentVerification: '我们已发送验证链接至',
+        resendEmail: '重新发送',
+        backToHome: '返回首页',
+        resetPassword: '重置密码',
+        resetSubtitle: '输入您的邮箱，我们将发送重置链接。',
+        sendResetLink: '发送重置链接',
+        sending: '发送中...',
+        backToSignIn: '返回登录',
+        setNewPassword: '设置新密码',
+        newPasswordPlaceholder: '新密码（至少 8 位）',
+        confirmPasswordPlaceholder: '确认新密码',
+        updatePassword: '更新密码',
+        updating: '更新中...',
+        passwordUpdated: '密码已更新！',
+        passwordUpdatedSub: '您的密码已成功重置，现在可以用新密码登录。',
+        signInNow: '立即登录',
+    }
+};
+
+let authLang = localStorage.getItem('epic_lang') || 'en';
+
+function applyAuthLang(lang) {
+    authLang = lang;
+    localStorage.setItem('epic_lang', lang);
+    const t = authI18n[lang];
+    const btn = document.getElementById('auth-lang-btn');
+    if (btn) btn.textContent = lang === 'en' ? '中文' : 'EN';
+
+    // Left panel
+    const backLink = document.querySelector('.auth-back-link');
+    if (backLink) backLink.childNodes[backLink.childNodes.length-1].textContent = ' ' + t.backToEpic;
+    const headline = document.querySelector('.auth-left-headline');
+    if (headline) headline.innerHTML = t.headline1 + '<br><span class="auth-left-accent">' + t.headline2 + '</span>';
+    const desc = document.querySelector('.auth-left-desc');
+    if (desc) desc.textContent = t.desc;
+
+    // Tabs
+    const tabs = document.querySelectorAll('.auth-tab');
+    if (tabs[0]) tabs[0].textContent = t.tabSignin;
+    if (tabs[1]) tabs[1].textContent = t.tabSignup;
+
+    // Sign in panel
+    const siTitle = document.querySelector('#panel-signin .auth-panel-title');
+    if (siTitle) siTitle.textContent = t.welcomeBack;
+    const siSub = document.querySelector('#panel-signin .auth-panel-subtitle');
+    if (siSub) siSub.textContent = t.signInSubtitle;
+    const methodTabs = document.querySelectorAll('.signin-method-tab');
+    if (methodTabs[0]) methodTabs[0].childNodes[methodTabs[0].childNodes.length-1].textContent = ' ' + t.passwordLogin;
+    if (methodTabs[1]) methodTabs[1].childNodes[methodTabs[1].childNodes.length-1].textContent = ' ' + t.emailOTP;
+    const siEmail = document.getElementById('si-email');
+    if (siEmail) siEmail.placeholder = t.emailPlaceholder;
+    const siPwd = document.getElementById('si-password');
+    if (siPwd) siPwd.placeholder = t.passwordPlaceholder;
+    const forgotLink = document.querySelector('.auth-forgot');
+    if (forgotLink) forgotLink.textContent = t.forgotPassword;
+    const siBtn = document.querySelector('#signin-submit-btn .btn-text');
+    if (siBtn) siBtn.textContent = t.signInBtn;
+    const siLoading = document.querySelector('#signin-submit-btn .btn-loading');
+    if (siLoading) siLoading.textContent = t.signingIn;
+    const siSwitch = document.querySelector('#panel-signin .auth-switch-text');
+    if (siSwitch) siSwitch.childNodes[0].textContent = t.noAccount + ' ';
+    const siSwitchLink = document.querySelector('#panel-signin .auth-switch-link');
+    if (siSwitchLink) siSwitchLink.textContent = t.createOne;
+
+    // OTP
+    const otpEmail = document.getElementById('otp-email');
+    if (otpEmail) otpEmail.placeholder = t.emailPlaceholder;
+    const otpSendText = document.getElementById('otp-send-text');
+    if (otpSendText) otpSendText.textContent = t.sendCode;
+    const otpVerifyBtn = document.querySelector('#otp-verify-btn .btn-text');
+    if (otpVerifyBtn) otpVerifyBtn.textContent = t.verifySignIn;
+
+    // Create account panel
+    const suTitle = document.querySelector('#panel-signup .auth-panel-title');
+    if (suTitle) suTitle.textContent = t.createAccount;
+    const suSub = document.querySelector('#panel-signup .auth-panel-subtitle');
+    if (suSub) suSub.textContent = t.joinEpic;
+    const suFirst = document.getElementById('su-firstname');
+    if (suFirst) suFirst.placeholder = t.firstName;
+    const suLast = document.getElementById('su-lastname');
+    if (suLast) suLast.placeholder = t.lastName;
+    const suEmail = document.getElementById('su-email');
+    if (suEmail) suEmail.placeholder = t.emailPlaceholder;
+    const suRole = document.getElementById('su-role');
+    if (suRole && suRole.options[0]) suRole.options[0].text = t.selectRole;
+    const suBtn = document.querySelector('#signup-submit-btn .btn-text');
+    if (suBtn) suBtn.textContent = t.createAccountBtn;
+    const suLoading = document.querySelector('#signup-submit-btn .btn-loading');
+    if (suLoading) suLoading.textContent = t.creatingAccount;
+    const suSwitch = document.querySelector('#panel-signup .auth-switch-text');
+    if (suSwitch) suSwitch.childNodes[0].textContent = t.alreadyHave + ' ';
+    const suSwitchLink = document.querySelector('#panel-signup .auth-switch-link');
+    if (suSwitchLink) suSwitchLink.textContent = t.signIn;
+
+    // Forgot password
+    const fpTitle = document.querySelector('#panel-forgot .auth-panel-title');
+    if (fpTitle) fpTitle.textContent = t.resetPassword;
+    const fpSub = document.querySelector('#panel-forgot .auth-panel-subtitle');
+    if (fpSub) fpSub.textContent = t.resetSubtitle;
+    const fpBtn = document.querySelector('#forgot-submit-btn .btn-text');
+    if (fpBtn) fpBtn.textContent = t.sendResetLink;
+    const fpLoading = document.querySelector('#forgot-submit-btn .btn-loading');
+    if (fpLoading) fpLoading.textContent = t.sending;
+    const fpBack = document.querySelector('#panel-forgot .auth-back-panel-btn');
+    if (fpBack) fpBack.childNodes[fpBack.childNodes.length-1].textContent = ' ' + t.backToSignIn;
+
+    // Reset password
+    const rpTitle = document.querySelector('#panel-reset .auth-panel-title');
+    if (rpTitle) rpTitle.textContent = t.setNewPassword;
+    const rpNewPwd = document.getElementById('reset-password');
+    if (rpNewPwd) rpNewPwd.placeholder = t.newPasswordPlaceholder;
+    const rpConfirm = document.getElementById('reset-confirm');
+    if (rpConfirm) rpConfirm.placeholder = t.confirmPasswordPlaceholder;
+    const rpBtn = document.querySelector('#reset-submit-btn .btn-text');
+    if (rpBtn) rpBtn.textContent = t.updatePassword;
+    const rpLoading = document.querySelector('#reset-submit-btn .btn-loading');
+    if (rpLoading) rpLoading.textContent = t.updating;
+
+    // Reset success
+    const rsTitle = document.querySelector('#panel-reset-success .auth-panel-title');
+    if (rsTitle) rsTitle.textContent = t.passwordUpdated;
+    const rsSub = document.querySelector('#panel-reset-success .auth-panel-subtitle');
+    if (rsSub) rsSub.textContent = t.passwordUpdatedSub;
+}
+
+// Apply saved language on load
+document.addEventListener('DOMContentLoaded', function() {
+    if (authLang === 'zh') applyAuthLang('zh');
+    else {
+        const btn = document.getElementById('auth-lang-btn');
+        if (btn) btn.textContent = '中文';
+    }
+});
+</script>
 </body>
 </html>
