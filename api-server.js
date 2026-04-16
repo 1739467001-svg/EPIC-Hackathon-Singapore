@@ -398,6 +398,105 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
+    /* GET /api/profile?email=xxx */
+    if (pathname === '/api/profile' && req.method === 'GET') {
+        try {
+            const email = parsed.query.email;
+            if (!email) return json(res, 400, { error: 'Email is required.' });
+
+            const rows = await supabaseQuery('players',
+                'email=eq.' + encodeURIComponent(email) + '&select=email,first_name,last_name,title,bio,github,linkedin,discord,website,skills,team_status'
+            );
+            if (!rows || rows.length === 0) return json(res, 404, { error: 'User not found.' });
+
+            const u = rows[0];
+            return json(res, 200, {
+                email:      u.email,
+                firstName:  u.first_name  || '',
+                lastName:   u.last_name   || '',
+                title:      u.title       || '',
+                bio:        u.bio         || '',
+                github:     u.github      || '',
+                linkedin:   u.linkedin    || '',
+                discord:    u.discord     || '',
+                website:    u.website     || '',
+                skills:     u.skills      || '',
+                teamStatus: u.team_status || 'solo',
+            });
+        } catch (err) {
+            console.error('[get-profile]', err.message);
+            return json(res, 500, { error: 'Failed to load profile.' });
+        }
+    }
+
+    /* POST /api/profile — update profile fields */
+    if (pathname === '/api/profile' && req.method === 'POST') {
+        try {
+            const body = await parseBody(req);
+            const { email } = body;
+            if (!email) return json(res, 400, { error: 'Email is required.' });
+
+            // Build update object with only provided fields
+            const update = {};
+            if (body.firstName  !== undefined) update.first_name   = body.firstName;
+            if (body.lastName   !== undefined) update.last_name    = body.lastName;
+            if (body.title      !== undefined) update.title        = body.title;
+            if (body.bio        !== undefined) update.bio          = body.bio;
+            if (body.github     !== undefined) update.github       = body.github;
+            if (body.linkedin   !== undefined) update.linkedin     = body.linkedin;
+            if (body.discord    !== undefined) update.discord      = body.discord;
+            if (body.website    !== undefined) update.website      = body.website;
+            if (body.skills     !== undefined) update.skills       = body.skills;
+            if (body.teamStatus !== undefined) update.team_status  = body.teamStatus;
+
+            if (Object.keys(update).length === 0) return json(res, 400, { error: 'No fields to update.' });
+
+            await supabaseRequest('PATCH',
+                '/rest/v1/players?email=eq.' + encodeURIComponent(email),
+                update
+            );
+            console.log('[profile] Updated profile for', email);
+            return json(res, 200, { ok: true });
+        } catch (err) {
+            console.error('[profile]', err.message);
+            return json(res, 500, { error: 'Failed to update profile.' });
+        }
+    }
+
+    /* POST /api/change-password — verify current password then update */
+    if (pathname === '/api/change-password' && req.method === 'POST') {
+        try {
+            const body = await parseBody(req);
+            const { email, currentPassword, newPassword } = body;
+            if (!email || !currentPassword || !newPassword)
+                return json(res, 400, { error: 'All fields are required.' });
+            if (newPassword.length < 8)
+                return json(res, 400, { error: 'New password must be at least 8 characters.' });
+
+            // Verify current password
+            const currentHash = hashPassword(currentPassword);
+            const rows = await supabaseQuery('players',
+                'email=eq.' + encodeURIComponent(email) +
+                '&password_hash=eq.' + currentHash +
+                '&select=email'
+            );
+            if (!rows || rows.length === 0)
+                return json(res, 401, { error: 'Current password is incorrect.' });
+
+            // Update to new password
+            const newHash = hashPassword(newPassword);
+            await supabaseRequest('PATCH',
+                '/rest/v1/players?email=eq.' + encodeURIComponent(email),
+                { password_hash: newHash }
+            );
+            console.log('[change-password] Password changed for', email);
+            return json(res, 200, { ok: true });
+        } catch (err) {
+            console.error('[change-password]', err.message);
+            return json(res, 500, { error: 'Failed to change password.' });
+        }
+    }
+
     json(res, 404, { error: 'Not found' });
 });
 

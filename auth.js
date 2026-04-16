@@ -291,7 +291,8 @@ async function handleSignIn(e) {
             return;
         }
 
-        // Successful login — redirect to homepage
+        // Successful login — save user info and redirect to homepage
+        localStorage.setItem('epic_user', JSON.stringify(data.user));
         window.location.href = 'http://43.130.98.104:8080/index.html';
     } catch {
         showError('signin-error', 'Network error. Please check your connection and try again.');
@@ -378,7 +379,8 @@ async function handleOTPVerify(e) {
         // Stop countdown
         if (otpCountdownTimer) clearInterval(otpCountdownTimer);
 
-        // Successful OTP login — redirect to homepage
+        // Successful OTP login — save user info and redirect to homepage
+        localStorage.setItem('epic_user', JSON.stringify(data.user));
         window.location.href = 'http://43.130.98.104:8080/index.html';
     } catch {
         showError('otp-verify-error', 'Network error. Please check your connection and try again.');

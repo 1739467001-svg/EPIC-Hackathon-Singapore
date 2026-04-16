@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile — EPIC Hackathon Singapore</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+        --bg: #0a0a0a;
+        --surface: #111111;
+        --surface2: #1a1a1a;
+        --border: rgba(255,255,255,0.08);
+        --border2: rgba(255,255,255,0.12);
+        --text: #ffffff;
+        --text-muted: rgba(255,255,255,0.5);
+        --text-dim: rgba(255,255,255,0.3);
+        --green: #22C55E;
+        --green-dark: #16a34a;
+        --red: #f87171;
+        --radius: 14px;
+    }
+
+    html, body {
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Inter', sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* ===== Header ===== */
+    .header {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: rgba(10,10,10,0.92);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--border);
+        padding: 0 24px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .header-logo {
+        font-size: 20px;
+        font-weight: 900;
+        color: var(--text);
+        text-decoration: none;
+        letter-spacing: -0.5px;
+    }
+    .header-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .back-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 500;
+        padding: 8px 14px;
+        border-radius: 10px;
+        transition: background 0.2s, color 0.2s;
+    }
+    .back-btn:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+    .user-chip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(255,255,255,0.07);
+        border: 1px solid var(--border2);
+        border-radius: 100px;
+        padding: 5px 14px 5px 5px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text);
+    }
+    .user-chip-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--green), var(--green-dark));
+        color: #000;
+        font-weight: 800;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .logout-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: none;
+        border: 1px solid rgba(248,113,113,0.3);
+        color: var(--red);
+        font-size: 13px;
+        font-weight: 500;
+        padding: 7px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .logout-btn:hover { background: rgba(248,113,113,0.08); }
+
+    /* ===== Page Layout ===== */
+    .page {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 40px 24px 80px;
+    }
+    .page-title {
+        font-size: 28px;
+        font-weight: 800;
+        color: var(--text);
+        margin-bottom: 6px;
+    }
+    .page-subtitle {
+        font-size: 15px;
+        color: var(--text-muted);
+        margin-bottom: 36px;
+    }
+
+    /* ===== Tabs ===== */
+    .tabs {
+        display: flex;
+        gap: 4px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 4px;
+        margin-bottom: 32px;
+        width: fit-content;
+    }
+    .tab-btn {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 18px;
+        border-radius: 9px;
+        border: none;
+        background: none;
+        color: var(--text-muted);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s, color 0.2s;
+        font-family: 'Inter', sans-serif;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+        background: rgba(255,255,255,0.1);
+        color: var(--text);
+    }
+
+    /* ===== Card ===== */
+    .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 28px 32px;
+        margin-bottom: 20px;
+    }
+    .card-title {
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 4px;
+    }
+    .card-desc {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-bottom: 24px;
+    }
+
+    /* ===== Avatar Section ===== */
+    .avatar-section {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        margin-bottom: 28px;
+        padding-bottom: 28px;
+        border-bottom: 1px solid var(--border);
+    }
+    .profile-avatar {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--green), var(--green-dark));
+        color: #000;
+        font-weight: 900;
+        font-size: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .avatar-info h3 {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 4px;
+    }
+    .avatar-info p {
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+
+    /* ===== Form ===== */
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+    .form-grid.single { grid-template-columns: 1fr; }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+    }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .form-input, .form-select, .form-textarea {
+        width: 100%;
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-size: 14px;
+        color: var(--text);
+        font-family: 'Inter', sans-serif;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        outline: none;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px rgba(34,197,94,0.12);
+    }
+    .form-input::placeholder, .form-textarea::placeholder { color: var(--text-dim); }
+    .form-select { appearance: none; cursor: pointer; }
+    .form-textarea { resize: vertical; min-height: 90px; }
+
+    /* Input with prefix icon */
+    .input-wrap {
+        position: relative;
+    }
+    .input-prefix {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-dim);
+        font-size: 13px;
+        pointer-events: none;
+        user-select: none;
+    }
+    .input-wrap .form-input { padding-left: 38px; }
+
+    /* Skills tags */
+    .skills-input-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        border-radius: 12px;
+        padding: 10px 12px;
+        min-height: 48px;
+        cursor: text;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .skills-input-wrap:focus-within {
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px rgba(34,197,94,0.12);
+    }
+    .skill-tag {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(34,197,94,0.12);
+        border: 1px solid rgba(34,197,94,0.25);
+        color: var(--green);
+        border-radius: 8px;
+        padding: 3px 10px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+    .skill-tag-remove {
+        background: none;
+        border: none;
+        color: var(--green);
+        cursor: pointer;
+        padding: 0;
+        font-size: 15px;
+        line-height: 1;
+        opacity: 0.7;
+    }
+    .skill-tag-remove:hover { opacity: 1; }
+    .skills-text-input {
+        border: none;
+        outline: none;
+        background: none;
+        color: var(--text);
+        font-size: 14px;
+        font-family: 'Inter', sans-serif;
+        min-width: 120px;
+        flex: 1;
+    }
+    .skills-text-input::placeholder { color: var(--text-dim); }
+    .skills-hint { font-size: 12px; color: var(--text-dim); margin-top: 5px; }
+
+    /* ===== Password field ===== */
+    .pw-wrap { position: relative; }
+    .pw-wrap .form-input { padding-right: 44px; }
+    .pw-toggle {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-dim);
+        cursor: pointer;
+        padding: 0;
+        display: flex;
+        align-items: center;
+    }
+    .pw-toggle:hover { color: var(--text-muted); }
+
+    /* Password strength */
+    .pw-strength-bar {
+        height: 4px;
+        border-radius: 4px;
+        background: var(--surface2);
+        margin-top: 8px;
+        overflow: hidden;
+    }
+    .pw-strength-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s, background 0.3s;
+        width: 0%;
+    }
+    .pw-strength-text { font-size: 12px; color: var(--text-dim); margin-top: 5px; }
+
+    /* ===== Buttons ===== */
+    .btn-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 24px;
+    }
+    .btn-save {
+        background: var(--green);
+        color: #000;
+        border: none;
+        border-radius: 12px;
+        padding: 12px 28px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: 'Inter', sans-serif;
+        transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn-save:hover { opacity: 0.9; }
+    .btn-save:active { transform: scale(0.98); }
+    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-cancel {
+        background: none;
+        border: 1px solid var(--border2);
+        color: var(--text-muted);
+        border-radius: 12px;
+        padding: 12px 20px;
+        font-size: 15px;
+        font-weight: 500;
+        cursor: pointer;
+        font-family: 'Inter', sans-serif;
+        transition: background 0.2s, color 0.2s;
+    }
+    .btn-cancel:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+
+    /* ===== Toast ===== */
+    .toast {
+        position: fixed;
+        bottom: 28px;
+        left: 50%;
+        transform: translateX(-50%) translateY(80px);
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        border-radius: 14px;
+        padding: 14px 22px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+        z-index: 9999;
+        transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+        opacity: 0;
+        white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    .toast.success { border-color: rgba(34,197,94,0.3); }
+    .toast.error   { border-color: rgba(248,113,113,0.3); }
+    .toast-icon { font-size: 18px; }
+
+    /* ===== Error message ===== */
+    .field-error {
+        font-size: 12px;
+        color: var(--red);
+        margin-top: 4px;
+    }
+    .form-error-box {
+        background: rgba(248,113,113,0.08);
+        border: 1px solid rgba(248,113,113,0.2);
+        border-radius: 10px;
+        padding: 11px 14px;
+        font-size: 13px;
+        color: var(--red);
+        margin-bottom: 16px;
+        display: none;
+    }
+
+    /* ===== Tab panels ===== */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 600px) {
+        .page { padding: 24px 16px 60px; }
+        .form-grid { grid-template-columns: 1fr; }
+        .card { padding: 20px 18px; }
+        .tabs { width: 100%; }
+        .tab-btn { flex: 1; justify-content: center; padding: 9px 10px; font-size: 13px; }
+        .btn-row { flex-direction: column-reverse; }
+        .btn-save, .btn-cancel { width: 100%; text-align: center; }
+        .header { padding: 0 16px; }
+    }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+    <a href="index.html" class="header-logo">EPIC</a>
+    <div class="header-right">
+        <a href="index.html" class="back-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            Back to Home
+        </a>
+        <div class="user-chip">
+            <div class="user-chip-avatar" id="hdr-avatar">U</div>
+            <span id="hdr-name">User</span>
+        </div>
+        <button class="logout-btn" onclick="logout()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Sign Out
+        </button>
+    </div>
+</header>
+
+<!-- Page -->
+<div class="page">
+    <h1 class="page-title">My Profile</h1>
+    <p class="page-subtitle">Manage your personal information and account settings.</p>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('info')" id="tab-info">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            Personal Info
+        </button>
+        <button class="tab-btn" onclick="switchTab('links')" id="tab-links">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            Links & Skills
+        </button>
+        <button class="tab-btn" onclick="switchTab('security')" id="tab-security">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Security
+        </button>
+    </div>
+
+    <!-- Tab: Personal Info -->
+    <div class="tab-panel active" id="panel-info">
+        <div class="card">
+            <div class="avatar-section">
+                <div class="profile-avatar" id="profile-avatar">U</div>
+                <div class="avatar-info">
+                    <h3 id="profile-fullname">Loading...</h3>
+                    <p id="profile-email-display"></p>
+                </div>
+            </div>
+            <div class="card-title">Basic Information</div>
+            <div class="card-desc">Update your name, role, and bio.</div>
+            <div id="info-error" class="form-error-box"></div>
+            <form id="form-info" onsubmit="saveInfo(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">First Name</label>
+                        <input class="form-input" id="p-firstname" type="text" placeholder="First name" autocomplete="given-name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Name</label>
+                        <input class="form-input" id="p-lastname" type="text" placeholder="Last name" autocomplete="family-name">
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Email</label>
+                        <input class="form-input" id="p-email" type="email" placeholder="you@example.com" readonly style="opacity:0.5;cursor:not-allowed;">
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Role / Title</label>
+                        <select class="form-select" id="p-role">
+                            <option value="">Select your role</option>
+                            <option value="Developer">Developer</option>
+                            <option value="Designer">Designer</option>
+                            <option value="Product Manager">Product Manager</option>
+                            <option value="Founder">Founder</option>
+                            <option value="Data Scientist">Data Scientist</option>
+                            <option value="ML Engineer">ML Engineer</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="Business Development">Business Development</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group full">
+                        <label class="form-label">Bio</label>
+                        <textarea class="form-textarea" id="p-bio" placeholder="Tell others about yourself, your background, and what you're building..." rows="4"></textarea>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="submit" class="btn-save" id="btn-save-info">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tab: Links & Skills -->
+    <div class="tab-panel" id="panel-links">
+        <div class="card">
+            <div class="card-title">Social Links</div>
+            <div class="card-desc">Connect your profiles so teammates can find you.</div>
+            <div id="links-error" class="form-error-box"></div>
+            <form id="form-links" onsubmit="saveLinks(event)">
+                <div class="form-grid single">
+                    <div class="form-group">
+                        <label class="form-label">GitHub</label>
+                        <div class="input-wrap">
+                            <span class="input-prefix">github.com/</span>
+                            <input class="form-input" id="p-github" type="text" placeholder="yourusername">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">LinkedIn</label>
+                        <div class="input-wrap">
+                            <span class="input-prefix">linkedin.com/in/</span>
+                            <input class="form-input" id="p-linkedin" type="text" placeholder="yourusername">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Discord</label>
+                        <div class="input-wrap">
+                            <span class="input-prefix" style="font-size:16px;">⌗</span>
+                            <input class="form-input" id="p-discord" type="text" placeholder="username#1234 or username">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Personal Website</label>
+                        <input class="form-input" id="p-website" type="url" placeholder="https://yoursite.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Skills</label>
+                        <div class="skills-input-wrap" id="skills-wrap" onclick="document.getElementById('skills-input').focus()">
+                            <!-- skill tags injected here -->
+                            <input class="skills-text-input" id="skills-input" placeholder="Type a skill and press Enter..." autocomplete="off">
+                        </div>
+                        <div class="skills-hint">Press Enter or comma to add a skill tag</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Team Status</label>
+                        <select class="form-select" id="p-team-status">
+                            <option value="solo">Solo — not looking for team</option>
+                            <option value="looking">Looking for teammates</option>
+                            <option value="has_team">Already have a team</option>
+                            <option value="open">Open to join a team</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="submit" class="btn-save" id="btn-save-links">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tab: Security -->
+    <div class="tab-panel" id="panel-security">
+        <div class="card">
+            <div class="card-title">Change Password</div>
+            <div class="card-desc">Choose a strong password to keep your account secure.</div>
+            <div id="security-error" class="form-error-box"></div>
+            <form id="form-security" onsubmit="changePassword(event)">
+                <div class="form-grid single">
+                    <div class="form-group">
+                        <label class="form-label">Current Password</label>
+                        <div class="pw-wrap">
+                            <input class="form-input" id="p-current-pw" type="password" placeholder="Enter current password" autocomplete="current-password">
+                            <button type="button" class="pw-toggle" onclick="togglePw('p-current-pw', this)">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">New Password</label>
+                        <div class="pw-wrap">
+                            <input class="form-input" id="p-new-pw" type="password" placeholder="At least 8 characters" autocomplete="new-password" oninput="checkPwStrength(this.value)">
+                            <button type="button" class="pw-toggle" onclick="togglePw('p-new-pw', this)">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                        <div class="pw-strength-bar"><div class="pw-strength-fill" id="pw-strength-fill"></div></div>
+                        <div class="pw-strength-text" id="pw-strength-text"></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirm New Password</label>
+                        <div class="pw-wrap">
+                            <input class="form-input" id="p-confirm-pw" type="password" placeholder="Repeat new password" autocomplete="new-password">
+                            <button type="button" class="pw-toggle" onclick="togglePw('p-confirm-pw', this)">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="submit" class="btn-save" id="btn-save-pw">Update Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+    <span class="toast-icon" id="toast-icon">✓</span>
+    <span id="toast-msg">Saved!</span>
+</div>
+
+<script>
+const API_BASE = 'http://43.130.98.104:3001/api';
+let currentUser = null;
+let skillsList = [];
+
+// ===== Init =====
+(function init() {
+    const raw = localStorage.getItem('epic_user');
+    if (!raw) { window.location.href = 'auth.html'; return; }
+    try {
+        currentUser = JSON.parse(raw);
+    } catch(e) { window.location.href = 'auth.html'; return; }
+
+    // Fill header
+    const initials = getInitials(currentUser);
+    document.getElementById('hdr-avatar').textContent = initials;
+    document.getElementById('hdr-name').textContent = currentUser.firstName || currentUser.email.split('@')[0];
+
+    // Fill avatar
+    document.getElementById('profile-avatar').textContent = initials;
+
+    // Check hash for tab
+    if (window.location.hash === '#security') switchTab('security');
+
+    // Load profile from server
+    loadProfile();
+})();
+
+function getInitials(user) {
+    const f = (user.firstName || '')[0] || '';
+    const l = (user.lastName  || '')[0] || '';
+    return (f + l).toUpperCase() || (user.email || 'U')[0].toUpperCase();
+}
+
+// ===== Load Profile =====
+async function loadProfile() {
+    try {
+        const res = await fetch(`${API_BASE}/profile?email=${encodeURIComponent(currentUser.email)}`);
+        if (!res.ok) throw new Error('Failed to load');
+        const data = await res.json();
+        fillForm(data);
+    } catch(e) {
+        // Fallback to localStorage data
+        fillForm(currentUser);
+    }
+}
+
+function fillForm(data) {
+    const firstName = data.firstName || data.first_name || '';
+    const lastName  = data.lastName  || data.last_name  || '';
+    const email     = data.email || currentUser.email;
+    const fullName  = (firstName + ' ' + lastName).trim() || email.split('@')[0];
+
+    // Header & avatar
+    document.getElementById('profile-fullname').textContent = fullName;
+    document.getElementById('profile-email-display').textContent = email;
+    document.getElementById('profile-avatar').textContent = getInitials({ firstName, lastName, email });
+
+    // Info tab
+    setVal('p-firstname', firstName);
+    setVal('p-lastname',  lastName);
+    setVal('p-email',     email);
+    setVal('p-role',      data.title || data.role || '');
+    setVal('p-bio',       data.bio || '');
+
+    // Links tab
+    let github = data.github || '';
+    github = github.replace(/^https?:\/\/github\.com\//i, '');
+    let linkedin = data.linkedin || '';
+    linkedin = linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//i, '');
+    setVal('p-github',      github);
+    setVal('p-linkedin',    linkedin);
+    setVal('p-discord',     data.discord || '');
+    setVal('p-website',     data.website || '');
+    setVal('p-team-status', data.team_status || data.teamStatus || 'solo');
+
+    // Skills
+    skillsList = [];
+    if (data.skills) {
+        skillsList = data.skills.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    renderSkills();
+}
+
+function setVal(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === 'SELECT') {
+        for (let i = 0; i < el.options.length; i++) {
+            if (el.options[i].value === val) { el.selectedIndex = i; break; }
+        }
+    } else {
+        el.value = val || '';
+    }
+}
+
+// ===== Skills Tags =====
+function renderSkills() {
+    const wrap = document.getElementById('skills-wrap');
+    const input = document.getElementById('skills-input');
+    // Remove old tags
+    wrap.querySelectorAll('.skill-tag').forEach(t => t.remove());
+    // Insert tags before input
+    skillsList.forEach(skill => {
+        const tag = document.createElement('div');
+        tag.className = 'skill-tag';
+        tag.innerHTML = `${skill}<button type="button" class="skill-tag-remove" onclick="removeSkill('${skill.replace(/'/g,"\\'")}')">×</button>`;
+        wrap.insertBefore(tag, input);
+    });
+}
+
+function removeSkill(skill) {
+    skillsList = skillsList.filter(s => s !== skill);
+    renderSkills();
+}
+
+document.getElementById('skills-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const val = this.value.trim().replace(/,$/, '');
+        if (val && !skillsList.includes(val)) {
+            skillsList.push(val);
+            renderSkills();
+        }
+        this.value = '';
+    } else if (e.key === 'Backspace' && this.value === '' && skillsList.length > 0) {
+        skillsList.pop();
+        renderSkills();
+    }
+});
+
+// ===== Tab Switch =====
+function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    document.getElementById('panel-' + name).classList.add('active');
+}
+
+// ===== Save Info =====
+async function saveInfo(e) {
+    e.preventDefault();
+    hideError('info-error');
+    const btn = document.getElementById('btn-save-info');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const payload = {
+        email:     currentUser.email,
+        firstName: document.getElementById('p-firstname').value.trim(),
+        lastName:  document.getElementById('p-lastname').value.trim(),
+        title:     document.getElementById('p-role').value,
+        bio:       document.getElementById('p-bio').value.trim(),
+    };
+
+    try {
+        const res = await fetch(`${API_BASE}/profile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to save');
+
+        // Update localStorage
+        currentUser.firstName = payload.firstName;
+        currentUser.lastName  = payload.lastName;
+        localStorage.setItem('epic_user', JSON.stringify(currentUser));
+
+        // Update display
+        const fullName = (payload.firstName + ' ' + payload.lastName).trim();
+        document.getElementById('profile-fullname').textContent = fullName;
+        document.getElementById('profile-avatar').textContent = getInitials(currentUser);
+        document.getElementById('hdr-avatar').textContent = getInitials(currentUser);
+        document.getElementById('hdr-name').textContent = payload.firstName || fullName;
+
+        showToast('Profile updated successfully!', 'success');
+    } catch(err) {
+        showError('info-error', err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+    }
+}
+
+// ===== Save Links =====
+async function saveLinks(e) {
+    e.preventDefault();
+    hideError('links-error');
+    const btn = document.getElementById('btn-save-links');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const githubVal   = document.getElementById('p-github').value.trim();
+    const linkedinVal = document.getElementById('p-linkedin').value.trim();
+
+    const payload = {
+        email:       currentUser.email,
+        github:      githubVal   ? 'https://github.com/' + githubVal   : '',
+        linkedin:    linkedinVal ? 'https://linkedin.com/in/' + linkedinVal : '',
+        discord:     document.getElementById('p-discord').value.trim(),
+        website:     document.getElementById('p-website').value.trim(),
+        skills:      skillsList.join(', '),
+        teamStatus:  document.getElementById('p-team-status').value,
+    };
+
+    try {
+        const res = await fetch(`${API_BASE}/profile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to save');
+        showToast('Links & skills saved!', 'success');
+    } catch(err) {
+        showError('links-error', err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+    }
+}
+
+// ===== Change Password =====
+async function changePassword(e) {
+    e.preventDefault();
+    hideError('security-error');
+
+    const currentPw = document.getElementById('p-current-pw').value;
+    const newPw     = document.getElementById('p-new-pw').value;
+    const confirmPw = document.getElementById('p-confirm-pw').value;
+
+    if (!currentPw) return showError('security-error', 'Please enter your current password.');
+    if (newPw.length < 8) return showError('security-error', 'New password must be at least 8 characters.');
+    if (newPw !== confirmPw) return showError('security-error', 'New passwords do not match.');
+
+    const btn = document.getElementById('btn-save-pw');
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+
+    try {
+        const res = await fetch(`${API_BASE}/change-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: currentUser.email, currentPassword: currentPw, newPassword: newPw })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to update password');
+
+        // Clear fields
+        document.getElementById('p-current-pw').value = '';
+        document.getElementById('p-new-pw').value = '';
+        document.getElementById('p-confirm-pw').value = '';
+        document.getElementById('pw-strength-fill').style.width = '0%';
+        document.getElementById('pw-strength-text').textContent = '';
+
+        showToast('Password updated successfully!', 'success');
+    } catch(err) {
+        showError('security-error', err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Update Password';
+    }
+}
+
+// ===== Password Strength =====
+function checkPwStrength(pw) {
+    const fill = document.getElementById('pw-strength-fill');
+    const text = document.getElementById('pw-strength-text');
+    if (!pw) { fill.style.width = '0%'; text.textContent = ''; return; }
+    let score = 0;
+    if (pw.length >= 8)  score++;
+    if (pw.length >= 12) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    const levels = [
+        { w:'20%', c:'#ef4444', t:'Weak' },
+        { w:'40%', c:'#f97316', t:'Fair' },
+        { w:'60%', c:'#eab308', t:'Good' },
+        { w:'80%', c:'#22c55e', t:'Strong' },
+        { w:'100%',c:'#16a34a', t:'Very Strong' },
+    ];
+    const l = levels[Math.min(score - 1, 4)] || levels[0];
+    fill.style.width = l.w;
+    fill.style.background = l.c;
+    text.textContent = l.t;
+    text.style.color = l.c;
+}
+
+// ===== Password Toggle =====
+function togglePw(id, btn) {
+    const input = document.getElementById(id);
+    const isText = input.type === 'text';
+    input.type = isText ? 'password' : 'text';
+    btn.innerHTML = isText
+        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+}
+
+// ===== Toast =====
+let toastTimer = null;
+function showToast(msg, type = 'success') {
+    const toast = document.getElementById('toast');
+    const icon  = document.getElementById('toast-icon');
+    const msgEl = document.getElementById('toast-msg');
+    toast.className = 'toast ' + type;
+    icon.textContent = type === 'success' ? '✓' : '✕';
+    msgEl.textContent = msg;
+    toast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+// ===== Error helpers =====
+function showError(id, msg) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = 'block';
+}
+function hideError(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+}
+
+// ===== Logout =====
+function logout() {
+    localStorage.removeItem('epic_user');
+    window.location.href = 'auth.html';
+}
+</script>
+</body>
+</html>
