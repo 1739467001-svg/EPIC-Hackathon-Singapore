@@ -872,34 +872,45 @@
         const localUser = JSON.parse(localStorage.getItem('epic_user') || '{}');
         const email = localUser.email;
         if (!email) return;
-        // Show modal immediately with local data
-        fillProfileModal(localUser);
-        document.getElementById('pm-msg').textContent = '';
+        // Show modal with skeleton loading state
+        document.getElementById('pm-msg').textContent = 'Loading...';
+        document.getElementById('pm-msg').style.color = 'rgba(255,255,255,0.4)';
         document.getElementById('profile-modal').style.display = 'flex';
-        // Then fetch latest from server and refresh
+        fillProfileModal(localUser); // show cached data instantly
+        // Always fetch latest from server (real-time sync)
         try {
-            const res = await fetch('/api/profile?email=' + encodeURIComponent(email));
+            const res = await fetch('/api/profile?email=' + encodeURIComponent(email) + '&t=' + Date.now());
             if (res.ok) {
                 const fresh = await res.json();
-                // Merge fresh data into localStorage
+                // Merge fresh server data (server is source of truth)
                 const merged = Object.assign({}, localUser, fresh);
                 localStorage.setItem('epic_user', JSON.stringify(merged));
                 fillProfileModal(merged);
+                document.getElementById('pm-msg').textContent = '';
+            } else {
+                document.getElementById('pm-msg').textContent = '';
             }
-        } catch(e) { /* use local data silently */ }
+        } catch(e) {
+            document.getElementById('pm-msg').textContent = '';
+        }
     }
     function fillProfileModal(user) {
-        document.getElementById('pm-firstname').value   = user.firstName  || '';
-        document.getElementById('pm-lastname').value    = user.lastName   || '';
-        document.getElementById('pm-email').value       = user.email      || '';
-        document.getElementById('pm-title').value       = user.title      || '';
-        document.getElementById('pm-bio').value         = user.bio        || '';
-        document.getElementById('pm-github').value      = user.github     || '';
-        document.getElementById('pm-linkedin').value    = user.linkedin   || '';
-        document.getElementById('pm-discord').value     = user.discord    || '';
-        document.getElementById('pm-website').value     = user.website    || '';
-        document.getElementById('pm-skills').value      = user.skills     || '';
-        document.getElementById('pm-team-status').value = user.teamStatus || '';
+        document.getElementById('pm-firstname').value        = user.firstName  || user.first_name  || '';
+        document.getElementById('pm-lastname').value         = user.lastName   || user.last_name   || '';
+        document.getElementById('pm-email').value            = user.email      || '';
+        document.getElementById('pm-age').value              = user.age        || '';
+        document.getElementById('pm-location').value         = user.location   || '';
+        document.getElementById('pm-title').value            = user.title      || '';
+        document.getElementById('pm-bio').value              = user.bio        || '';
+        document.getElementById('pm-github').value           = user.github     || '';
+        document.getElementById('pm-linkedin').value         = user.linkedin   || '';
+        document.getElementById('pm-discord').value          = user.discord    || '';
+        document.getElementById('pm-website').value          = user.website    || '';
+        document.getElementById('pm-twitter-x').value        = user.twitterX   || user.twitter_x  || '';
+        document.getElementById('pm-rednote').value          = user.rednote    || '';
+        document.getElementById('pm-skills').value           = user.skills     || '';
+        document.getElementById('pm-team-status').value      = user.teamStatus || user.team_status || '';
+        document.getElementById('pm-hackathon-history').value = user.hackathonHistory || user.hackathon_history || '';
     }
     function closeProfileModal() {
         document.getElementById('profile-modal').style.display = 'none';
@@ -915,16 +926,21 @@
         if (!lastName)  { msg.style.color='#f87171'; msg.textContent='Last name cannot be empty.'; return; }
         const body = {
             email,
-            firstName:  document.getElementById('pm-firstname').value.trim(),
-            lastName:   document.getElementById('pm-lastname').value.trim(),
-            title:      document.getElementById('pm-title').value.trim(),
-            bio:        document.getElementById('pm-bio').value.trim(),
-            github:     document.getElementById('pm-github').value.trim(),
-            linkedin:   document.getElementById('pm-linkedin').value.trim(),
-            discord:    document.getElementById('pm-discord').value.trim(),
-            website:    document.getElementById('pm-website').value.trim(),
-            skills:     document.getElementById('pm-skills').value.trim(),
-            teamStatus: document.getElementById('pm-team-status').value,
+            firstName:       document.getElementById('pm-firstname').value.trim(),
+            lastName:        document.getElementById('pm-lastname').value.trim(),
+            age:             document.getElementById('pm-age').value ? parseInt(document.getElementById('pm-age').value) : null,
+            location:        document.getElementById('pm-location').value.trim(),
+            title:           document.getElementById('pm-title').value.trim(),
+            bio:             document.getElementById('pm-bio').value.trim(),
+            github:          document.getElementById('pm-github').value.trim(),
+            linkedin:        document.getElementById('pm-linkedin').value.trim(),
+            discord:         document.getElementById('pm-discord').value.trim(),
+            website:         document.getElementById('pm-website').value.trim(),
+            twitterX:        document.getElementById('pm-twitter-x').value.trim(),
+            rednote:         document.getElementById('pm-rednote').value.trim(),
+            skills:          document.getElementById('pm-skills').value.trim(),
+            teamStatus:      document.getElementById('pm-team-status').value,
+            hackathonHistory: document.getElementById('pm-hackathon-history').value.trim(),
         };
         const btn = document.getElementById('pm-save-btn');
         btn.disabled = true; btn.textContent = 'Saving...';
@@ -1054,6 +1070,16 @@
             <input id="pm-lastname" type="text" placeholder="Last name" style="width:100%;background:#222;border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;">
           </div>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label style="display:block;color:rgba(255,255,255,0.6);font-size:12px;margin-bottom:6px;">Age</label>
+            <input id="pm-age" type="number" min="16" max="99" placeholder="e.g. 25" style="width:100%;background:#222;border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="display:block;color:rgba(255,255,255,0.6);font-size:12px;margin-bottom:6px;">Location</label>
+            <input id="pm-location" type="text" placeholder="e.g. Singapore, SG" style="width:100%;background:#222;border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;">
+          </div>
+        </div>
         <div style="margin-bottom:12px;">
           <label style="display:block;color:rgba(255,255,255,0.6);font-size:12px;margin-bottom:6px;">Email</label>
           <input id="pm-email" type="email" readonly style="width:100%;background:#1a1a1a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:10px 14px;color:rgba(255,255,255,0.4);font-size:14px;outline:none;box-sizing:border-box;cursor:not-allowed;">
@@ -1094,6 +1120,14 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:rgba(255,255,255,0.4);flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             <input id="pm-website" type="text" placeholder="yourwebsite.com" style="flex:1;background:#222;border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;">
           </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color:rgba(255,255,255,0.4);flex-shrink:0;"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            <input id="pm-twitter-x" type="text" placeholder="X (Twitter) username" style="flex:1;background:#222;border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color:rgba(255,255,255,0.4);flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+            <input id="pm-rednote" type="text" placeholder="RedNote username or URL" style="flex:1;background:#222;border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;">
+          </div>
         </div>
 
         <div style="color:rgba(255,255,255,0.5);font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;">Skills & Team Status</div>
@@ -1101,7 +1135,7 @@
           <label style="display:block;color:rgba(255,255,255,0.6);font-size:12px;margin-bottom:6px;">Skills <span style="color:rgba(255,255,255,0.3);">(comma separated)</span></label>
           <input id="pm-skills" type="text" placeholder="React, Python, UI/UX, LLMs..." style="width:100%;background:#222;border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;">
         </div>
-        <div style="margin-bottom:28px;">
+        <div style="margin-bottom:12px;">
           <label style="display:block;color:rgba(255,255,255,0.6);font-size:12px;margin-bottom:6px;">Team Status</label>
           <select id="pm-team-status" style="width:100%;background:#222;border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;">
             <option value="">Select status</option>
@@ -1110,6 +1144,15 @@
             <option value="full">Team is full</option>
             <option value="not-looking">Not looking</option>
           </select>
+        </div>
+        <div style="margin-bottom:24px;">
+          <label style="display:block;color:rgba(255,255,255,0.6);font-size:12px;margin-bottom:6px;">Hackathon History <span style="color:rgba(255,255,255,0.3);">(awards & past events)</span></label>
+          <textarea id="pm-hackathon-history" rows="3" placeholder="e.g. ETHGlobal 2024 (Winner), HackSG 2025 (Finalist)..." style="width:100%;background:#222;border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;resize:vertical;"></textarea>
+        </div>
+
+        <div style="display:flex;align-items:flex-start;gap:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+          <span style="font-size:14px;flex-shrink:0;">🔒</span>
+          <p style="color:rgba(255,255,255,0.4);font-size:11px;line-height:1.6;margin:0;">We are committed to data minimization: we collect only what is necessary, use it only for the stated purposes, and strictly prohibit the sale of your data.</p>
         </div>
 
         <div id="pm-msg" style="font-size:13px;min-height:20px;margin-bottom:12px;"></div>
