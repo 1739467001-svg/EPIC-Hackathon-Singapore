@@ -244,22 +244,12 @@ input, select { font-family: inherit; }
 
 /* Panels */
 .auth-panel { display: none; }
-.auth-panel.active { display: block; animation: panelEnter 0.35s cubic-bezier(0.16,1,0.3,1) both; }
+.auth-panel.active { display: block; animation: fadeUp 0.3s ease both; }
 
-@keyframes panelEnter {
-    from { opacity: 0; transform: translateY(16px) scale(0.98); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-}
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
 }
-/* Page enter */
-@keyframes authPageIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-body { animation: authPageIn 0.3s ease both; }
 
 /* Panel header */
 .auth-panel-title {
@@ -468,11 +458,7 @@ body { animation: authPageIn 0.3s ease both; }
 }
 
 .signin-method-panel { display: none; }
-.signin-method-panel.active { display: block; animation: methodEnter 0.25s cubic-bezier(0.16,1,0.3,1) both; }
-@keyframes methodEnter {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
+.signin-method-panel.active { display: block; animation: fadeUp 0.25s ease both; }
 
 /* OTP input row */
 .otp-send-row {
@@ -681,9 +667,231 @@ body { animation: authPageIn 0.3s ease both; }
     .otp-send-row { grid-template-columns: 1fr; }
     .otp-send-btn { width: 100%; }
 }
+
+/* ============================================================
+   PREMIUM ANIMATIONS & INTERACTIONS
+   ============================================================ */
+
+/* Page entrance — left panel slides in from left, right from right */
+.auth-left {
+    animation: slideInLeft 0.7s cubic-bezier(0.22,1,0.36,1) both;
+}
+.auth-right {
+    animation: slideInRight 0.7s cubic-bezier(0.22,1,0.36,1) both;
+}
+@keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-32px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(32px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Panel transitions — smoother, with scale */
+.auth-panel.active {
+    animation: panelEnter 0.38s cubic-bezier(0.22,1,0.36,1) both;
+}
+@keyframes panelEnter {
+    from { opacity: 0; transform: translateY(18px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Tab active indicator — sliding pill */
+.auth-tabs {
+    position: relative;
+}
+.auth-tab {
+    position: relative;
+    z-index: 1;
+    transition: color 0.25s ease;
+}
+.auth-tab.active {
+    background: #ffffff;
+    color: #0a0a0a;
+    transition: background 0.3s cubic-bezier(0.22,1,0.36,1), color 0.25s ease;
+}
+
+/* Input field — premium focus ring */
+.auth-field {
+    transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+.auth-field:focus {
+    border-color: rgba(34,197,94,0.5);
+    background: #1e1e1e;
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.12), 0 2px 12px rgba(0,0,0,0.3);
+    transform: translateY(-1px);
+}
+.auth-field.field-error {
+    border-color: rgba(239,68,68,0.6) !important;
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.1) !important;
+    animation: fieldShake 0.4s cubic-bezier(0.36,0.07,0.19,0.97) both;
+}
+@keyframes fieldShake {
+    10%, 90%  { transform: translateX(-2px); }
+    20%, 80%  { transform: translateX(3px); }
+    30%, 50%, 70% { transform: translateX(-4px); }
+    40%, 60%  { transform: translateX(4px); }
+}
+.auth-field.field-success {
+    border-color: rgba(34,197,94,0.5);
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.08);
+}
+
+/* Submit button — premium loading state */
+.auth-submit-btn {
+    position: relative;
+    overflow: hidden;
+    transition: background 0.25s ease, transform 0.2s cubic-bezier(0.22,1,0.36,1),
+                box-shadow 0.25s ease, opacity 0.2s ease;
+}
+.auth-submit-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%);
+    transform: translateX(-100%);
+    transition: transform 0s;
+}
+.auth-submit-btn:hover::after {
+    transform: translateX(100%);
+    transition: transform 0.5s ease;
+}
+.auth-submit-btn:active {
+    transform: scale(0.98) translateY(1px);
+}
+.auth-submit-btn.btn-state-loading {
+    pointer-events: none;
+    opacity: 0.85;
+}
+.auth-submit-btn.btn-state-success {
+    background: #22C55E !important;
+    color: #fff !important;
+    transform: scale(1.02);
+    box-shadow: 0 4px 20px rgba(34,197,94,0.4);
+}
+
+/* Spinner inside button */
+.btn-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-top-color: #0a0a0a;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Error message — slide in */
+.auth-form-error:not(.hidden) {
+    animation: errorSlideIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+}
+@keyframes errorSlideIn {
+    from { opacity: 0; transform: translateY(-6px); max-height: 0; }
+    to   { opacity: 1; transform: translateY(0); max-height: 80px; }
+}
+
+/* Success icon — pop in with bounce */
+.auth-success-icon, .auth-verify-icon {
+    animation: iconPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+    animation-delay: 0.15s;
+}
+@keyframes iconPop {
+    from { opacity: 0; transform: scale(0.5); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+/* Page exit overlay — full screen green flash before redirect */
+.page-exit-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: #22C55E;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+.page-exit-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* Toast — premium slide in from top-right */
+.epic-toast {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 99998;
+    padding: 14px 20px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 500;
+    max-width: 360px;
+    line-height: 1.5;
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    animation: toastIn 0.4s cubic-bezier(0.22,1,0.36,1) both;
+    cursor: pointer;
+}
+.epic-toast.toast-exit {
+    animation: toastOut 0.3s cubic-bezier(0.4,0,1,1) both;
+}
+@keyframes toastIn {
+    from { opacity: 0; transform: translateX(24px) translateY(-8px) scale(0.95); }
+    to   { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
+}
+@keyframes toastOut {
+    from { opacity: 1; transform: translateX(0) scale(1); }
+    to   { opacity: 0; transform: translateX(24px) scale(0.95); }
+}
+.epic-toast-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.epic-toast-error {
+    background: rgba(20,10,10,0.9);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: #fca5a5;
+}
+.epic-toast-info {
+    background: rgba(10,20,12,0.9);
+    border: 1px solid rgba(34,197,94,0.3);
+    color: #86efac;
+}
+
+/* OTP step transition */
+#otp-step-2 {
+    animation: panelEnter 0.35s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+/* Left panel brand stagger */
+.auth-left-logo   { animation: fadeUpStagger 0.6s cubic-bezier(0.22,1,0.36,1) 0.1s both; }
+.auth-left-headline { animation: fadeUpStagger 0.6s cubic-bezier(0.22,1,0.36,1) 0.2s both; }
+.auth-left-desc   { animation: fadeUpStagger 0.6s cubic-bezier(0.22,1,0.36,1) 0.3s both; }
+.auth-stats-card  { animation: fadeUpStagger 0.6s cubic-bezier(0.22,1,0.36,1) 0.4s both; }
+@keyframes fadeUpStagger {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Right panel inner stagger */
+.auth-tabs         { animation: fadeUpStagger 0.5s cubic-bezier(0.22,1,0.36,1) 0.25s both; }
+.auth-right-inner > .auth-panel.active { animation-delay: 0.1s; }
     </style>
 </head>
 <body>
+
+<!-- Page exit overlay for smooth transitions -->
+<div class="page-exit-overlay" id="pageExitOverlay"></div>
 
 <!-- Language toggle button -->
 <button class="auth-lang-btn" id="auth-lang-btn" onclick="applyAuthLang(authLang === 'en' ? 'zh' : 'en')">中文</button>

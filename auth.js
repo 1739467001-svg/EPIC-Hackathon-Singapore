@@ -243,6 +243,16 @@ function showError(elementId, msg) {
     if (!el) return;
     el.textContent = msg;
     el.classList.remove('hidden');
+    // Shake nearby input fields
+    const container = el.closest('form') || el.parentElement;
+    if (container) {
+        container.querySelectorAll('.auth-field').forEach(f => {
+            f.classList.remove('field-error');
+            void f.offsetWidth;
+            f.classList.add('field-error');
+            setTimeout(() => f.classList.remove('field-error'), 500);
+        });
+    }
 }
 
 function clearError(elementId) {
@@ -258,6 +268,19 @@ function setLoading(btnId, loading) {
     const textEl    = btn.querySelector('.btn-text');
     const loadingEl = btn.querySelector('.btn-loading');
     btn.disabled = loading;
+    btn.classList.toggle('btn-state-loading', loading);
+    if (loading) {
+        // Add spinner before loading text
+        if (loadingEl && !loadingEl.querySelector('.btn-spinner')) {
+            const spinner = document.createElement('span');
+            spinner.className = 'btn-spinner';
+            loadingEl.prepend(spinner);
+        }
+    } else {
+        btn.classList.remove('btn-state-success');
+        const spinner = btn.querySelector('.btn-spinner');
+        if (spinner) spinner.remove();
+    }
     if (textEl)    textEl.classList.toggle('hidden', loading);
     if (loadingEl) loadingEl.classList.toggle('hidden', !loading);
 }
@@ -291,9 +314,16 @@ async function handleSignIn(e) {
             return;
         }
 
-        // Successful login — save user info and redirect to homepage
+        // Successful login — save user info and redirect with smooth transition
         localStorage.setItem('epic_user', JSON.stringify(data.user));
-        window.location.href = '/index.html';
+        // Show success state on button
+        const btn = document.getElementById('signin-submit-btn');
+        if (btn) {
+            btn.classList.add('btn-state-success');
+            btn.querySelector('.btn-text').textContent = '✓ Welcome back!';
+            btn.querySelector('.btn-loading').classList.add('hidden');
+        }
+        setTimeout(() => smoothRedirect('/index.html'), 600);
     } catch {
         showError('signin-error', 'Network error. Please check your connection and try again.');
         setLoading('signin-submit-btn', false);
@@ -379,9 +409,15 @@ async function handleOTPVerify(e) {
         // Stop countdown
         if (otpCountdownTimer) clearInterval(otpCountdownTimer);
 
-        // Successful OTP login — save user info and redirect to homepage
+        // Successful OTP login — save user info and redirect with smooth transition
         localStorage.setItem('epic_user', JSON.stringify(data.user));
-        window.location.href = '/index.html';
+        const btn = document.getElementById('otp-verify-btn');
+        if (btn) {
+            btn.classList.add('btn-state-success');
+            btn.querySelector('.btn-text').textContent = '✓ Verified!';
+            btn.querySelector('.btn-loading').classList.add('hidden');
+        }
+        setTimeout(() => smoothRedirect('/index.html'), 600);
     } catch {
         showError('otp-verify-error', 'Network error. Please check your connection and try again.');
         setLoading('otp-verify-btn', false);
@@ -531,21 +567,42 @@ async function resendVerification() {
 }
 
 /* ============================================================
-   Toast Notification
+   Toast Notification — Premium
    ============================================================ */
 function showToast(msg, type = 'error') {
-    const colors = {
-        error: 'background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.25);color:#ff9999;',
-        info:  'background:rgba(34,197,94,0.10);border:1px solid rgba(34,197,94,0.25);color:#86efac;'
+    // Remove existing toasts
+    document.querySelectorAll('.epic-toast').forEach(t => t.remove());
+
+    const icons = {
+        error: `<svg class="epic-toast-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+        info:  `<svg class="epic-toast-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
     };
     const toast = document.createElement('div');
-    toast.style.cssText = [
-        'position:fixed;top:24px;right:24px;z-index:9999;',
-        'padding:13px 18px;border-radius:12px;font-size:14px;',
-        'max-width:360px;line-height:1.5;font-family:Inter,sans-serif;',
-        colors[type] || colors.error
-    ].join('');
-    toast.textContent = msg;
+    toast.className = `epic-toast epic-toast-${type === 'info' ? 'info' : 'error'}`;
+    toast.innerHTML = (icons[type] || icons.error) + `<span>${msg}</span>`;
+    toast.onclick = () => dismissToast(toast);
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 6000);
+
+    const timer = setTimeout(() => dismissToast(toast), 5000);
+    toast._timer = timer;
+}
+
+function dismissToast(toast) {
+    if (!toast || !toast.parentNode) return;
+    clearTimeout(toast._timer);
+    toast.classList.add('toast-exit');
+    setTimeout(() => toast.remove(), 300);
+}
+
+/* ============================================================
+   Page Transition — Smooth redirect with overlay
+   ============================================================ */
+function smoothRedirect(url, delay = 400) {
+    const overlay = document.getElementById('pageExitOverlay');
+    if (overlay) {
+        overlay.classList.add('active');
+        setTimeout(() => { window.location.href = url; }, delay);
+    } else {
+        window.location.href = url;
+    }
 }

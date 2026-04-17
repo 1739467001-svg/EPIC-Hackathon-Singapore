@@ -486,9 +486,164 @@
         .card { padding: 14px 12px; }
         .tab-btn { font-size: 11px; padding: 8px 6px; }
     }
+
+    /* ============================================================
+       PREMIUM PROFILE ANIMATIONS
+       ============================================================ */
+
+    /* Page entrance — header slides down, content fades up */
+    .header {
+        animation: headerSlideDown 0.5s cubic-bezier(0.22,1,0.36,1) both;
+    }
+    @keyframes headerSlideDown {
+        from { opacity: 0; transform: translateY(-20px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Page content stagger */
+    .page-title    { animation: fadeUpStagger 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s both; }
+    .page-subtitle { animation: fadeUpStagger 0.55s cubic-bezier(0.22,1,0.36,1) 0.18s both; }
+    .tabs          { animation: fadeUpStagger 0.55s cubic-bezier(0.22,1,0.36,1) 0.26s both; }
+    .tab-panel.active .card:nth-child(1) { animation: fadeUpStagger 0.5s cubic-bezier(0.22,1,0.36,1) 0.32s both; }
+    .tab-panel.active .card:nth-child(2) { animation: fadeUpStagger 0.5s cubic-bezier(0.22,1,0.36,1) 0.42s both; }
+    .tab-panel.active .card:nth-child(3) { animation: fadeUpStagger 0.5s cubic-bezier(0.22,1,0.36,1) 0.52s both; }
+    @keyframes fadeUpStagger {
+        from { opacity: 0; transform: translateY(22px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Tab panel switch animation */
+    .tab-panel.active {
+        animation: tabPanelIn 0.35s cubic-bezier(0.22,1,0.36,1) both;
+    }
+    @keyframes tabPanelIn {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Tab button — smooth active indicator */
+    .tab-btn {
+        transition: background 0.25s cubic-bezier(0.22,1,0.36,1), color 0.2s ease;
+    }
+    .tab-btn.active {
+        background: rgba(255,255,255,0.12);
+        color: var(--text);
+        box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+    }
+
+    /* Card hover — subtle lift */
+    .card {
+        transition: box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.22,1,0.36,1);
+    }
+    .card:hover {
+        box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+        transform: translateY(-2px);
+    }
+
+    /* Input focus — premium glow */
+    .form-input, .form-select, .form-textarea {
+        transition: border-color 0.25s ease, background 0.25s ease,
+                    box-shadow 0.3s ease, transform 0.2s ease;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+        border-color: rgba(34,197,94,0.45);
+        background: #1a1a1a;
+        box-shadow: 0 0 0 3px rgba(34,197,94,0.1), 0 2px 10px rgba(0,0,0,0.25);
+        transform: translateY(-1px);
+        outline: none;
+    }
+
+    /* Save button — shimmer + success state */
+    .btn-save {
+        position: relative;
+        overflow: hidden;
+        transition: background 0.25s ease, transform 0.2s cubic-bezier(0.22,1,0.36,1),
+                    box-shadow 0.25s ease;
+    }
+    .btn-save::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%);
+        transform: translateX(-100%);
+        transition: transform 0s;
+    }
+    .btn-save:hover::after {
+        transform: translateX(100%);
+        transition: transform 0.5s ease;
+    }
+    .btn-save:active { transform: scale(0.98) translateY(1px); }
+    .btn-save.btn-success {
+        background: var(--green) !important;
+        box-shadow: 0 4px 20px rgba(34,197,94,0.4);
+        transform: scale(1.02);
+    }
+
+    /* Toast — upgraded with backdrop blur */
+    .toast {
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+    }
+    .toast.show {
+        transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease;
+    }
+    .toast.success {
+        background: rgba(10,20,12,0.92);
+        border-color: rgba(34,197,94,0.35);
+        color: #86efac;
+    }
+    .toast.error {
+        background: rgba(20,10,10,0.92);
+        border-color: rgba(248,113,113,0.35);
+        color: #fca5a5;
+    }
+
+    /* Avatar — pulse on load */
+    .profile-avatar {
+        animation: avatarPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.4s both;
+    }
+    @keyframes avatarPop {
+        from { opacity: 0; transform: scale(0.7); }
+        to   { opacity: 1; transform: scale(1); }
+    }
+
+    /* Skeleton loading state */
+    .skeleton {
+        background: linear-gradient(90deg,
+            rgba(255,255,255,0.05) 25%,
+            rgba(255,255,255,0.1) 50%,
+            rgba(255,255,255,0.05) 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+        border-radius: 6px;
+        color: transparent !important;
+        pointer-events: none;
+    }
+    @keyframes shimmer {
+        from { background-position: 200% 0; }
+        to   { background-position: -200% 0; }
+    }
+
+    /* Page exit overlay */
+    .page-exit-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        background: #0a0a0a;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.35s cubic-bezier(0.4,0,0.2,1);
+    }
+    .page-exit-overlay.active {
+        opacity: 1;
+        pointer-events: all;
+    }
     </style>
 </head>
 <body>
+
+<!-- Page exit overlay -->
+<div class="page-exit-overlay" id="profileExitOverlay"></div>
 
 <!-- Header -->
 <header class="header">
@@ -696,17 +851,28 @@
 </div>
 
 <script>
-const API_BASE = 'http://43.130.98.104:3001/api';
+const API_BASE = '/api';
 let currentUser = null;
 let skillsList = [];
+
+// ===== Smooth redirect helper =====
+function smoothRedirect(url, delay = 380) {
+    const overlay = document.getElementById('profileExitOverlay');
+    if (overlay) {
+        overlay.classList.add('active');
+        setTimeout(() => { window.location.href = url; }, delay);
+    } else {
+        window.location.href = url;
+    }
+}
 
 // ===== Init =====
 (function init() {
     const raw = localStorage.getItem('epic_user');
-    if (!raw) { window.location.href = 'auth.html'; return; }
+    if (!raw) { smoothRedirect('auth.html'); return; }
     try {
         currentUser = JSON.parse(raw);
-    } catch(e) { window.location.href = 'auth.html'; return; }
+    } catch(e) { smoothRedirect('auth.html'); return; }
 
     // Fill header
     const initials = getInitials(currentUser);
@@ -831,7 +997,12 @@ function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
-    document.getElementById('panel-' + name).classList.add('active');
+    const panel = document.getElementById('panel-' + name);
+    panel.classList.add('active');
+    // Re-trigger animation by forcing reflow
+    panel.style.animation = 'none';
+    void panel.offsetWidth;
+    panel.style.animation = '';
 }
 
 // ===== Save Info =====
@@ -868,6 +1039,11 @@ async function saveInfo(e) {
         const fullName = (payload.firstName + ' ' + payload.lastName).trim();
         document.getElementById('profile-fullname').textContent = fullName;
         document.getElementById('profile-avatar').textContent = getInitials(currentUser);
+
+        // Success button state
+        btn.classList.add('btn-success');
+        btn.textContent = '✓ Saved!';
+        setTimeout(() => { btn.classList.remove('btn-success'); btn.textContent = 'Save Changes'; }, 2000);
         document.getElementById('hdr-avatar').textContent = getInitials(currentUser);
         document.getElementById('hdr-name').textContent = payload.firstName || fullName;
 
@@ -1028,7 +1204,14 @@ function logout() {
     document.cookie.split(';').forEach(c => {
         document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
     });
-    window.location.href = 'auth.html';
+    // Smooth exit transition
+    const overlay = document.getElementById('profileExitOverlay');
+    if (overlay) {
+        overlay.classList.add('active');
+        setTimeout(() => { window.location.href = 'auth.html'; }, 380);
+    } else {
+        window.location.href = 'auth.html';
+    }
 }
 
 // ===== Profile Page i18n =====
