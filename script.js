@@ -376,38 +376,34 @@ function initNavigation() {
 }
 
 /**
- * Language switch functionality
+ * Language switch functionality — slider toggle
  */
 function initLanguageSwitch() {
     const langToggle = document.getElementById('langToggle');
     const langDropdown = document.getElementById('langDropdown');
     const langOptions = document.querySelectorAll('.lang-option');
-    
+
+    // Single click = toggle EN ↔ ZH with slider animation
     langToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        langDropdown.classList.toggle('show');
-    });
-    
-    document.addEventListener('click', () => {
-        langDropdown.classList.remove('show');
-    });
-    
-    langOptions.forEach(option => {
-        option.addEventListener('click', () => {
-            const lang = option.dataset.lang;
-            currentLang = lang;
-            updateLanguage();
-            updateLangUI();
-            langDropdown.classList.remove('show');
-        });
-    });
-    // Also support direct toggle click (EN ↔ 中文 without dropdown)
-    langToggle.addEventListener('dblclick', (e) => {
         e.stopPropagation();
         currentLang = currentLang === 'en' ? 'zh' : 'en';
         updateLanguage();
         updateLangUI();
-        langDropdown.classList.remove('show');
+        if (langDropdown) langDropdown.classList.remove('show');
+    });
+
+    // Keep dropdown options in sync (for any legacy dropdown)
+    document.addEventListener('click', () => {
+        if (langDropdown) langDropdown.classList.remove('show');
+    });
+
+    langOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            currentLang = option.dataset.lang;
+            updateLanguage();
+            updateLangUI();
+            if (langDropdown) langDropdown.classList.remove('show');
+        });
     });
 }
 
@@ -556,8 +552,28 @@ function updateSection(id, texts) {
 }
 
 function updateLangUI() {
+    // Legacy text span (fallback)
     const langText = document.querySelector('.lang-text');
     if (langText) langText.textContent = currentLang === 'zh' ? '中文' : 'EN';
+
+    // New slider toggle
+    const langToggle = document.getElementById('langToggle');
+    if (langToggle) {
+        langToggle.classList.toggle('zh', currentLang === 'zh');
+        // Ripple animation
+        langToggle.classList.remove('switching');
+        void langToggle.offsetWidth; // force reflow
+        langToggle.classList.add('switching');
+        setTimeout(() => langToggle.classList.remove('switching'), 500);
+    }
+
+    // Sync mobile lang buttons
+    const enBtn = document.getElementById('mobile-lang-en');
+    const zhBtn = document.getElementById('mobile-lang-zh');
+    if (enBtn) enBtn.classList.toggle('active', currentLang === 'en');
+    if (zhBtn) zhBtn.classList.toggle('active', currentLang === 'zh');
+
+    // Sync dropdown options
     document.querySelectorAll('.lang-option').forEach(option => {
         option.classList.toggle('active', option.dataset.lang === currentLang);
     });
@@ -2275,33 +2291,3 @@ function showToast(message) {
         setTimeout(() => toast.remove(), 300);
     }, 2500);
 }
-
-// ===== Page Transition Animations =====
-(function initPageTransitions() {
-    // Page enter: fade in on load
-    document.body.classList.add('page-enter');
-    setTimeout(function() {
-        document.body.classList.remove('page-enter');
-    }, 400);
-
-    // Page exit: fade out before navigating
-    document.addEventListener('click', function(e) {
-        var link = e.target.closest('a[href]');
-        if (!link) return;
-        var href = link.getAttribute('href');
-        // Only handle same-origin internal page navigations (not anchors, not external)
-        if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
-        if (link.target === '_blank') return;
-        try {
-            var url = new URL(href, window.location.href);
-            if (url.origin !== window.location.origin) return;
-            if (url.pathname === window.location.pathname && !url.search) return;
-        } catch(err) { return; }
-
-        e.preventDefault();
-        document.body.classList.add('page-exit');
-        setTimeout(function() {
-            window.location.href = href;
-        }, 250);
-    });
-})();
