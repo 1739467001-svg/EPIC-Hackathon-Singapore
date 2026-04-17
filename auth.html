@@ -244,12 +244,22 @@ input, select { font-family: inherit; }
 
 /* Panels */
 .auth-panel { display: none; }
-.auth-panel.active { display: block; animation: fadeUp 0.3s ease both; }
+.auth-panel.active { display: block; animation: panelEnter 0.35s cubic-bezier(0.16,1,0.3,1) both; }
 
+@keyframes panelEnter {
+    from { opacity: 0; transform: translateY(16px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
 }
+/* Page enter */
+@keyframes authPageIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+body { animation: authPageIn 0.3s ease both; }
 
 /* Panel header */
 .auth-panel-title {
@@ -458,7 +468,11 @@ input, select { font-family: inherit; }
 }
 
 .signin-method-panel { display: none; }
-.signin-method-panel.active { display: block; animation: fadeUp 0.25s ease both; }
+.signin-method-panel.active { display: block; animation: methodEnter 0.25s cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes methodEnter {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
 
 /* OTP input row */
 .otp-send-row {

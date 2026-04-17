@@ -2275,3 +2275,33 @@ function showToast(message) {
         setTimeout(() => toast.remove(), 300);
     }, 2500);
 }
+
+// ===== Page Transition Animations =====
+(function initPageTransitions() {
+    // Page enter: fade in on load
+    document.body.classList.add('page-enter');
+    setTimeout(function() {
+        document.body.classList.remove('page-enter');
+    }, 400);
+
+    // Page exit: fade out before navigating
+    document.addEventListener('click', function(e) {
+        var link = e.target.closest('a[href]');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        // Only handle same-origin internal page navigations (not anchors, not external)
+        if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+        if (link.target === '_blank') return;
+        try {
+            var url = new URL(href, window.location.href);
+            if (url.origin !== window.location.origin) return;
+            if (url.pathname === window.location.pathname && !url.search) return;
+        } catch(err) { return; }
+
+        e.preventDefault();
+        document.body.classList.add('page-exit');
+        setTimeout(function() {
+            window.location.href = href;
+        }, 250);
+    });
+})();

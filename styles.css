@@ -1501,3 +1501,23 @@ body {
         min-width: 220px;
     }
 }
+
+/* ========================================
+   Page Transition Animations
+   ======================================== */
+@keyframes pageEnterFade {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pageExitFade {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-8px); }
+}
+
+body.page-enter {
+    animation: pageEnterFade 0.4s cubic-bezier(0.16,1,0.3,1) both;
+}
+body.page-exit {
+    animation: pageExitFade 0.25s ease both;
+    pointer-events: none;
+}
