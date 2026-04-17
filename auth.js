@@ -3,7 +3,7 @@
  * auth.js  (v4 — dual sign-in: password + OTP)
  */
 
-const API_BASE = 'http://43.130.98.104:8080/api';
+const API_BASE = '/api';
 
 let pendingEmail    = null;
 let otpCountdownTimer = null;
@@ -293,7 +293,7 @@ async function handleSignIn(e) {
 
         // Successful login — save user info and redirect to homepage
         localStorage.setItem('epic_user', JSON.stringify(data.user));
-        window.location.href = 'http://43.130.98.104:8080/index.html';
+        window.location.href = '/index.html';
     } catch {
         showError('signin-error', 'Network error. Please check your connection and try again.');
         setLoading('signin-submit-btn', false);
@@ -381,7 +381,7 @@ async function handleOTPVerify(e) {
 
         // Successful OTP login — save user info and redirect to homepage
         localStorage.setItem('epic_user', JSON.stringify(data.user));
-        window.location.href = 'http://43.130.98.104:8080/index.html';
+        window.location.href = '/index.html';
     } catch {
         showError('otp-verify-error', 'Network error. Please check your connection and try again.');
         setLoading('otp-verify-btn', false);
