@@ -806,12 +806,12 @@ input, select { font-family: inherit; }
     to   { opacity: 1; transform: scale(1); }
 }
 
-/* Page exit overlay — full screen green flash before redirect */
+/* Page exit overlay — smooth dark fade before redirect */
 .page-exit-overlay {
     position: fixed;
     inset: 0;
     z-index: 99999;
-    background: #22C55E;
+    background: #0a0a0a;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.35s cubic-bezier(0.4,0,0.2,1);
