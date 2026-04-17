@@ -324,6 +324,22 @@
     .skills-text-input::placeholder { color: var(--text-dim); }
     .skills-hint { font-size: 12px; color: var(--text-dim); margin-top: 5px; }
 
+    /* Privacy notice */
+    .privacy-notice {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        background: rgba(34,197,94,0.06);
+        border: 1px solid rgba(34,197,94,0.18);
+        border-radius: 10px;
+        padding: 12px 16px;
+        margin: 20px 0 4px;
+        color: rgba(255,255,255,0.5);
+        font-size: 12px;
+        line-height: 1.6;
+    }
+    .privacy-notice svg { color: #22C55E; opacity: 0.8; }
+
     /* ===== Password field ===== */
     .pw-wrap { position: relative; }
     .pw-wrap .form-input { padding-right: 44px; }
@@ -713,6 +729,14 @@
                         <label class="form-label" data-i18n="email">Email</label>
                         <input class="form-input" id="p-email" type="email" placeholder="you@example.com" readonly style="opacity:0.5;cursor:not-allowed;">
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">Age</label>
+                        <input class="form-input" id="p-age" type="number" placeholder="e.g. 25" min="16" max="99">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Location</label>
+                        <input class="form-input" id="p-location" type="text" placeholder="e.g. Singapore, SG">
+                    </div>
                     <div class="form-group full">
                         <label class="form-label" data-i18n="role">Role / Title</label>
                         <select class="form-select" id="p-role">
@@ -770,6 +794,20 @@
                         </div>
                     </div>
                     <div class="form-group">
+                        <label class="form-label">X (Twitter)</label>
+                        <div class="input-wrap">
+                            <span class="input-prefix">x.com/</span>
+                            <input class="form-input" id="p-twitter-x" type="text" placeholder="yourusername">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">RedNote (小红书)</label>
+                        <div class="input-wrap">
+                            <span class="input-prefix" style="font-size:13px;">🔴</span>
+                            <input class="form-input" id="p-rednote" type="text" placeholder="RedNote username or profile URL">
+                        </div>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label" data-i18n="website">Personal Website</label>
                         <input class="form-input" id="p-website" type="url" placeholder="https://yoursite.com">
                     </div>
@@ -781,6 +819,11 @@
                         </div>
                         <div class="skills-hint">Press Enter or comma to add a skill tag</div>
                     </div>
+                    <div class="form-group full">
+                        <label class="form-label">Hackathon History</label>
+                        <textarea class="form-textarea" id="p-hackathon-history" placeholder="e.g. ETHGlobal 2024 (Winner), HackSG 2025 (Finalist)..." rows="3"></textarea>
+                        <div class="skills-hint">List your past hackathon participations, awards, and achievements.</div>
+                    </div>
                     <div class="form-group">
                         <label class="form-label" data-i18n="teamStatus">Team Status</label>
                         <select class="form-select" id="p-team-status">
@@ -790,6 +833,10 @@
                             <option value="open">Open to join a team</option>
                         </select>
                     </div>
+                </div>
+                <div class="privacy-notice">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <span>We are committed to data minimization: we collect only what is necessary, use it only for the stated purposes, and strictly prohibit the sale of your data.</span>
                 </div>
                 <div class="btn-row">
                     <button type="submit" class="btn-save" id="btn-save-links" data-i18n="saveLinks">Save Changes</button>
@@ -937,6 +984,15 @@ function fillForm(data) {
     setVal('p-website',     data.website || '');
     setVal('p-team-status', data.team_status || data.teamStatus || 'solo');
 
+    // New fields
+    setVal('p-age',              data.age || '');
+    setVal('p-location',         data.location || '');
+    let twitterX = data.twitterX || data.twitter_x || '';
+    twitterX = twitterX.replace(/^https?:\/\/(www\.)?x\.com\//i, '').replace(/^https?:\/\/(www\.)?twitter\.com\//i, '');
+    setVal('p-twitter-x',        twitterX);
+    setVal('p-rednote',          data.rednote || '');
+    setVal('p-hackathon-history', data.hackathonHistory || data.hackathon_history || '');
+
     // Skills
     skillsList = [];
     if (data.skills) {
@@ -1019,6 +1075,8 @@ async function saveInfo(e) {
         lastName:  document.getElementById('p-lastname').value.trim(),
         title:     document.getElementById('p-role').value,
         bio:       document.getElementById('p-bio').value.trim(),
+        age:       document.getElementById('p-age').value.trim(),
+        location:  document.getElementById('p-location').value.trim(),
     };
 
     try {
@@ -1067,14 +1125,18 @@ async function saveLinks(e) {
     const githubVal   = document.getElementById('p-github').value.trim();
     const linkedinVal = document.getElementById('p-linkedin').value.trim();
 
+    const twitterXVal = document.getElementById('p-twitter-x').value.trim();
     const payload = {
-        email:       currentUser.email,
-        github:      githubVal   ? 'https://github.com/' + githubVal   : '',
-        linkedin:    linkedinVal ? 'https://linkedin.com/in/' + linkedinVal : '',
-        discord:     document.getElementById('p-discord').value.trim(),
-        website:     document.getElementById('p-website').value.trim(),
-        skills:      skillsList.join(', '),
-        teamStatus:  document.getElementById('p-team-status').value,
+        email:            currentUser.email,
+        github:           githubVal   ? 'https://github.com/' + githubVal   : '',
+        linkedin:         linkedinVal ? 'https://linkedin.com/in/' + linkedinVal : '',
+        discord:          document.getElementById('p-discord').value.trim(),
+        website:          document.getElementById('p-website').value.trim(),
+        skills:           skillsList.join(', '),
+        teamStatus:       document.getElementById('p-team-status').value,
+        twitterX:         twitterXVal ? 'https://x.com/' + twitterXVal : '',
+        rednote:          document.getElementById('p-rednote').value.trim(),
+        hackathonHistory: document.getElementById('p-hackathon-history').value.trim(),
     };
 
     try {
