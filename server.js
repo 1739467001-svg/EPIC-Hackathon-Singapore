@@ -17,7 +17,7 @@ const crypto = require('crypto');
 const url = require('url');
 const mysql = require('mysql2/promise');
 
-const PORT = Number(process.env.PORT || 3001);
+const PORT = Number(process.env.PORT || 3002);
 const BASE_URL = process.env.BASE_URL || 'https://evol.epicconnector.ai';
 const DB_PROVIDER = (process.env.DB_PROVIDER || 'supabase').toLowerCase();
 
