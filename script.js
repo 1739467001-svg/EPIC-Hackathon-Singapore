@@ -360,12 +360,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initMagicRingsBackground() {
-    const canvas = document.getElementById('magic-rings-canvas');
-    const hero = document.querySelector('.hero');
-    if (!canvas || !hero) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const mount = document.getElementById('magic-rings-container');
+    if (!mount) return;
 
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const config = {
@@ -379,6 +375,7 @@ function initMagicRingsBackground() {
         radiusStep: 0.1,
         scaleRate: 0.1,
         opacity: 1,
+        blur: 0,
         noiseAmount: 0.1,
         rotation: 0,
         ringGap: 1.5,
@@ -391,132 +388,285 @@ function initMagicRingsBackground() {
         clickBurst: false
     };
 
-    let width = 0;
-    let height = 0;
-    let dpr = 1;
-    let rafId = null;
+    const vertexShaderSource = `#version 300 es
+    precision highp float;
+    in vec2 aPosition;
+    void main() {
+        gl_Position = vec4(aPosition, 0.0, 1.0);
+    }`;
 
-    const hexToRgb = (hex) => {
-        const clean = hex.replace('#', '');
-        const full = clean.length === 3
-            ? clean.split('').map((char) => char + char).join('')
-            : clean;
-        const num = Number.parseInt(full, 16);
-        return {
-            r: (num >> 16) & 255,
-            g: (num >> 8) & 255,
-            b: num & 255
-        };
+    const fragmentShaderSource = `#version 300 es
+    precision highp float;
+
+    uniform float uTime;
+    uniform float uAttenuation;
+    uniform float uLineThickness;
+    uniform float uBaseRadius;
+    uniform float uRadiusStep;
+    uniform float uScaleRate;
+    uniform float uOpacity;
+    uniform float uNoiseAmount;
+    uniform float uRotation;
+    uniform float uRingGap;
+    uniform float uFadeIn;
+    uniform float uFadeOut;
+    uniform float uMouseInfluence;
+    uniform float uHoverAmount;
+    uniform float uHoverScale;
+    uniform float uParallax;
+    uniform float uBurst;
+    uniform vec2 uResolution;
+    uniform vec2 uMouse;
+    uniform vec3 uColor;
+    uniform vec3 uColorTwo;
+    uniform int uRingCount;
+
+    out vec4 outColor;
+
+    const float HP = 1.5707963;
+    const float CYCLE = 3.45;
+
+    float fadeValue(float t) {
+        return t < uFadeIn ? smoothstep(0.0, uFadeIn, t) : 1.0 - smoothstep(uFadeOut, CYCLE - 0.2, t);
+    }
+
+    float ring(vec2 p, float ri, float cut, float t0, float px) {
+        float t = mod(uTime + t0, CYCLE);
+        float r = ri + t / CYCLE * uScaleRate;
+        float d = abs(length(p) - r);
+        float a = atan(abs(p.y), abs(p.x)) / HP;
+        float th = max(1.0 - a, 0.5) * px * uLineThickness;
+        float h = (1.0 - smoothstep(th, th * 1.5, d)) + 1.0;
+        d += pow(cut * a, 3.0) * r;
+        return h * exp(-uAttenuation * d) * fadeValue(t);
+    }
+
+    void main() {
+        float px = 1.0 / min(uResolution.x, uResolution.y);
+        vec2 p = (gl_FragCoord.xy - 0.5 * uResolution.xy) * px;
+        float cr = cos(uRotation), sr = sin(uRotation);
+        p = mat2(cr, -sr, sr, cr) * p;
+        p -= uMouse * uMouseInfluence;
+        float sc = mix(1.0, uHoverScale, uHoverAmount) + uBurst * 0.3;
+        p /= sc;
+        vec3 c = vec3(0.0);
+        float rcf = max(float(uRingCount) - 1.0, 1.0);
+        for (int i = 0; i < 10; i++) {
+            if (i >= uRingCount) break;
+            float fi = float(i);
+            vec2 pr = p - fi * uParallax * uMouse;
+            vec3 rc = mix(uColor, uColorTwo, fi / rcf);
+            c = mix(c, rc, vec3(ring(pr, uBaseRadius + fi * uRadiusStep, pow(uRingGap, fi), i == 0 ? 0.0 : 2.95 * fi, px)));
+        }
+        c *= 1.0 + uBurst * 2.0;
+        float n = fract(sin(dot(gl_FragCoord.xy + uTime * 100.0, vec2(12.9898, 78.233))) * 43758.5453);
+        c += (n - 0.5) * uNoiseAmount;
+        outColor = vec4(c, max(c.r, max(c.g, c.b)) * uOpacity);
+    }`;
+
+    const canvas = document.createElement('canvas');
+    canvas.id = 'magic-rings-canvas';
+    canvas.setAttribute('aria-hidden', 'true');
+    mount.innerHTML = '';
+    mount.appendChild(canvas);
+
+    if (config.blur > 0) {
+        mount.style.filter = `blur(${config.blur}px)`;
+    }
+
+    const gl = canvas.getContext('webgl2', {
+        alpha: true,
+        antialias: true,
+        depth: false,
+        stencil: false,
+        premultipliedAlpha: true
+    });
+    if (!gl) return;
+
+    const compileShader = (type, source) => {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error('MagicRings shader compile error:', gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+        return shader;
     };
 
-    const mix = (a, b, t) => ({
-        r: a.r + (b.r - a.r) * t,
-        g: a.g + (b.g - a.g) * t,
-        b: a.b + (b.b - a.b) * t
-    });
+    const vertexShader = compileShader(gl.VERTEX_SHADER, vertexShaderSource);
+    const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+    if (!vertexShader || !fragmentShader) {
+        return;
+    }
 
-    const primary = hexToRgb(config.color);
-    const secondary = hexToRgb(config.colorTwo);
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error('MagicRings program link error:', gl.getProgramInfoLog(program));
+        return;
+    }
 
-    function resize() {
-        const bounds = hero.getBoundingClientRect();
-        width = Math.max(1, Math.floor(bounds.width));
-        height = Math.max(1, Math.floor(bounds.height));
-        dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([
+            -1, -1,
+             1, -1,
+            -1,  1,
+             1,  1
+        ]),
+        gl.STATIC_DRAW
+    );
+
+    const positionLocation = gl.getAttribLocation(program, 'aPosition');
+    const uniforms = {
+        uTime: gl.getUniformLocation(program, 'uTime'),
+        uAttenuation: gl.getUniformLocation(program, 'uAttenuation'),
+        uLineThickness: gl.getUniformLocation(program, 'uLineThickness'),
+        uBaseRadius: gl.getUniformLocation(program, 'uBaseRadius'),
+        uRadiusStep: gl.getUniformLocation(program, 'uRadiusStep'),
+        uScaleRate: gl.getUniformLocation(program, 'uScaleRate'),
+        uOpacity: gl.getUniformLocation(program, 'uOpacity'),
+        uNoiseAmount: gl.getUniformLocation(program, 'uNoiseAmount'),
+        uRotation: gl.getUniformLocation(program, 'uRotation'),
+        uRingGap: gl.getUniformLocation(program, 'uRingGap'),
+        uFadeIn: gl.getUniformLocation(program, 'uFadeIn'),
+        uFadeOut: gl.getUniformLocation(program, 'uFadeOut'),
+        uMouseInfluence: gl.getUniformLocation(program, 'uMouseInfluence'),
+        uHoverAmount: gl.getUniformLocation(program, 'uHoverAmount'),
+        uHoverScale: gl.getUniformLocation(program, 'uHoverScale'),
+        uParallax: gl.getUniformLocation(program, 'uParallax'),
+        uBurst: gl.getUniformLocation(program, 'uBurst'),
+        uResolution: gl.getUniformLocation(program, 'uResolution'),
+        uMouse: gl.getUniformLocation(program, 'uMouse'),
+        uColor: gl.getUniformLocation(program, 'uColor'),
+        uColorTwo: gl.getUniformLocation(program, 'uColorTwo'),
+        uRingCount: gl.getUniformLocation(program, 'uRingCount')
+    };
+
+    const hexToRgb = (hex) => {
+        const normalized = hex.replace('#', '');
+        const full = normalized.length === 3
+            ? normalized.split('').map((char) => char + char).join('')
+            : normalized;
+        const value = Number.parseInt(full, 16);
+        return [
+            ((value >> 16) & 255) / 255,
+            ((value >> 8) & 255) / 255,
+            (value & 255) / 255
+        ];
+    };
+
+    const mouse = [0, 0];
+    const smoothMouse = [0, 0];
+    let hoverAmount = 0;
+    let isHovered = false;
+    let burst = 0;
+    let frameId = null;
+
+    const resize = () => {
+        const width = Math.max(1, Math.floor(mount.clientWidth));
+        const height = Math.max(1, Math.floor(mount.clientHeight));
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         canvas.width = Math.floor(width * dpr);
         canvas.height = Math.floor(height * dpr);
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        gl.viewport(0, 0, canvas.width, canvas.height);
+    };
 
-    function ringAlpha(progress) {
-        if (progress < config.fadeIn) {
-            return Math.max(0, Math.min(1, progress / config.fadeIn));
-        }
-        const tail = Math.max(0.001, 1 - config.fadeOut);
-        return Math.max(0, Math.min(1, 1 - ((progress - config.fadeOut) / tail)));
-    }
+    const updatePointer = (event) => {
+        const rect = mount.getBoundingClientRect();
+        mouse[0] = (event.clientX - rect.left) / rect.width - 0.5;
+        mouse[1] = -((event.clientY - rect.top) / rect.height - 0.5);
+    };
 
-    function drawNoise() {
-        const count = Math.floor((width * height) / 18000 * config.noiseAmount * 18);
-        ctx.save();
-        for (let i = 0; i < count; i++) {
-            const x = Math.random() * width;
-            const y = Math.random() * height;
-            const alpha = Math.random() * 0.03;
-            ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-            ctx.fillRect(x, y, 1.2, 1.2);
-        }
-        ctx.restore();
-    }
+    const resetPointer = () => {
+        mouse[0] = 0;
+        mouse[1] = 0;
+    };
 
-    function render(now) {
+    const render = (time) => {
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        smoothMouse[0] += (mouse[0] - smoothMouse[0]) * 0.08;
+        smoothMouse[1] += (mouse[1] - smoothMouse[1]) * 0.08;
+        hoverAmount += ((isHovered ? 1 : 0) - hoverAmount) * 0.08;
+        burst *= 0.95;
+        if (burst < 0.001) burst = 0;
+
+        gl.useProgram(program);
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.enableVertexAttribArray(positionLocation);
+        gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+        const primary = hexToRgb(config.color);
+        const secondary = hexToRgb(config.colorTwo);
+
+        gl.uniform1f(uniforms.uTime, (time || 0) * 0.001 * config.speed);
+        gl.uniform1f(uniforms.uAttenuation, config.attenuation);
+        gl.uniform1f(uniforms.uLineThickness, config.lineThickness);
+        gl.uniform1f(uniforms.uBaseRadius, config.baseRadius);
+        gl.uniform1f(uniforms.uRadiusStep, config.radiusStep);
+        gl.uniform1f(uniforms.uScaleRate, config.scaleRate);
+        gl.uniform1f(uniforms.uOpacity, config.opacity);
+        gl.uniform1f(uniforms.uNoiseAmount, config.noiseAmount);
+        gl.uniform1f(uniforms.uRotation, (config.rotation * Math.PI) / 180);
+        gl.uniform1f(uniforms.uRingGap, config.ringGap);
+        gl.uniform1f(uniforms.uFadeIn, config.fadeIn);
+        gl.uniform1f(uniforms.uFadeOut, config.fadeOut);
+        gl.uniform1f(uniforms.uMouseInfluence, config.followMouse ? config.mouseInfluence : 0);
+        gl.uniform1f(uniforms.uHoverAmount, hoverAmount);
+        gl.uniform1f(uniforms.uHoverScale, config.hoverScale);
+        gl.uniform1f(uniforms.uParallax, config.parallax);
+        gl.uniform1f(uniforms.uBurst, config.clickBurst ? burst : 0);
+        gl.uniform2f(uniforms.uResolution, canvas.width, canvas.height);
+        gl.uniform2f(uniforms.uMouse, smoothMouse[0], smoothMouse[1]);
+        gl.uniform3f(uniforms.uColor, primary[0], primary[1], primary[2]);
+        gl.uniform3f(uniforms.uColorTwo, secondary[0], secondary[1], secondary[2]);
+        gl.uniform1i(uniforms.uRingCount, config.ringCount);
+
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    };
+
+    const animate = (time) => {
+        render(time);
+        frameId = requestAnimationFrame(animate);
+    };
+
+    const onResize = () => {
+        resize();
         if (prefersReducedMotion.matches) {
-            ctx.clearRect(0, 0, width, height);
-        } else {
-            rafId = requestAnimationFrame(render);
-            ctx.clearRect(0, 0, width, height);
+            render(0);
         }
-
-        const time = (now || 0) * 0.001 * config.speed;
-        const cx = width * 0.5;
-        const cy = height * 0.45;
-        const baseSize = Math.min(width, height);
-
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate((config.rotation * Math.PI) / 180);
-        ctx.globalCompositeOperation = 'lighter';
-
-        for (let i = 0; i < config.ringCount; i++) {
-            const progress = (time * 0.28 + i / config.ringCount) % 1;
-            const radius = baseSize * (config.baseRadius + i * config.radiusStep + progress * config.scaleRate);
-            const fade = ringAlpha(progress);
-            const color = mix(primary, secondary, config.ringCount === 1 ? 0 : i / (config.ringCount - 1));
-            const gapFactor = Math.pow(config.ringGap, i) * 0.018;
-            const start = -Math.PI * (0.9 - gapFactor);
-            const end = Math.PI * (0.9 - gapFactor * 0.7);
-
-            ctx.save();
-            ctx.rotate((i * 0.26) + time * 0.1);
-            ctx.shadowBlur = config.attenuation * 2.8;
-            ctx.shadowColor = `rgba(${color.r}, ${color.g}, ${color.b}, ${0.35 * fade})`;
-            ctx.lineWidth = Math.max(1, config.lineThickness + i * 0.18);
-            ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${Math.max(0, fade * (0.2 + config.opacity * 0.65))})`;
-            ctx.beginPath();
-            ctx.arc(0, 0, radius, start, end, false);
-            ctx.stroke();
-            ctx.restore();
-        }
-
-        const coreGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, baseSize * 0.3);
-        coreGradient.addColorStop(0, 'rgba(168, 85, 247, 0.18)');
-        coreGradient.addColorStop(0.45, 'rgba(99, 102, 241, 0.12)');
-        coreGradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
-        ctx.fillStyle = coreGradient;
-        ctx.beginPath();
-        ctx.arc(0, 0, baseSize * 0.3, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
-        drawNoise();
-    }
+    };
 
     resize();
     if (prefersReducedMotion.matches) {
         render(0);
     } else {
-        rafId = requestAnimationFrame(render);
+        frameId = requestAnimationFrame(animate);
     }
 
-    const onResize = () => {
-        resize();
-        if (prefersReducedMotion.matches) render(0);
-    };
+    mount.addEventListener('mousemove', updatePointer);
+    mount.addEventListener('mouseenter', () => { isHovered = true; });
+    mount.addEventListener('mouseleave', () => {
+        isHovered = false;
+        resetPointer();
+    });
+    mount.addEventListener('click', () => {
+        if (config.clickBurst) burst = 1;
+    });
 
     window.addEventListener('resize', onResize);
-
     if (prefersReducedMotion.addEventListener) {
         prefersReducedMotion.addEventListener('change', onResize);
     }
