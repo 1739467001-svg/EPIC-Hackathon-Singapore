@@ -1,1 +1,21 @@
-{"name": "epic-hackathon", "version": "1.0.0", "description": "EPIC Hackathon Singapore - 48-Hour AI Product Build", "main": "server.js", "scripts": {"start": "node server.js"}, "keywords": ["hackathon", "ai", "team-matching", "epic"], "author": "KINGKAZMAX", "license": "MIT"}
+{
+  "name": "epic-hackathon",
+  "version": "1.0.0",
+  "description": "EPIC Hackathon Singapore - 48-Hour AI Product Build",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "hackathon",
+    "ai",
+    "team-matching",
+    "epic"
+  ],
+  "author": "KINGKAZMAX",
+  "license": "MIT",
+  "dependencies": {
+    "mysql2": "^3.15.2",
+    "nodemailer": "^7.0.3"
+  }
+}

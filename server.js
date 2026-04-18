@@ -2,37 +2,57 @@
  * EPIC Hackathon Singapore — Registration API Server
  *
  * Endpoints:
- *  POST /api/register   — store pending registration, send verification email
- *  GET  /api/verify     — verify token, write to Supabase, redirect to login
- *  POST /api/resend     — resend verification email
- *  POST /api/login      — verify email+password, return user info
+ *  POST /api/register        — store pending registration, send verification email
+ *  GET  /api/verify          — verify token, write to MariaDB, redirect to login
+ *  POST /api/resend          — resend verification email
+ *  POST /api/login           — verify email+password, return user info
+ *  POST /api/send-otp        — send one-time code for passwordless login
+ *  POST /api/verify-otp      — verify one-time code and return user info
+ *  POST /api/forgot-password — send password reset email
+ *  POST /api/reset-password  — reset password by token
+ *  GET  /api/profile         — fetch user profile by email
+ *  POST /api/profile         — update user profile fields
+ *  POST /api/change-password — change password after verifying current password
  *
- * Port: 3001 (nginx proxies /api/ → localhost:3001)
+ * Port: 3001
  */
 
-const http       = require('http');
-const https      = require('https');
+const http = require('http');
+const crypto = require('crypto');
+const url = require('url');
 const nodemailer = require('nodemailer');
-const crypto     = require('crypto');
-const url        = require('url');
+const mysql = require('mysql2/promise');
 
-const PORT         = 3001;
-const BASE_URL     = 'https://evol.epicconnector.ai';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFod2Fmb3BzYndnZXZvZ2VlenF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQ5MTYsImV4cCI6MjA5MTY3MDkxNn0.wK7fZDyFaA39et0szUmMfvKVXgXTsrMxxt2Yo-ctFp0';
+const PORT = Number(process.env.PORT || 3001);
+const BASE_URL = process.env.BASE_URL || 'https://evol.epicconnector.ai';
+
+const DB_CONFIG = {
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: Number(process.env.DB_PORT || 3306),
+    user: process.env.DB_USER || 'epictest',
+    password: process.env.DB_PASSWORD || 'epichackathon',
+    database: process.env.DB_NAME || 'epic_hackathon',
+    charset: 'utf8mb4',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+};
 
 const SMTP = {
-    host: 'smtpdm.aliyun.com',
-    port: 465,
-    secure: true,
+    host: process.env.SMTP_HOST || 'smtpdm.aliyun.com',
+    port: Number(process.env.SMTP_PORT || 465),
+    secure: String(process.env.SMTP_SECURE || 'true') === 'true',
     auth: {
-        user: 'tutorial@dm.clouddreamai.com',
-        pass: 'Sl1kdjLDKS8L1JDKL'
+        user: process.env.SMTP_USER || 'tutorial@dm.clouddreamai.com',
+        pass: process.env.SMTP_PASS || 'Sl1kdjLDKS8L1JDKL'
     }
 };
 
-const pending  = new Map();
-const otpStore  = new Map(); // email -> { code, expiresAt, attempts }
-const resetStore = new Map(); // token -> { email, expiresAt }
+const pending = new Map();
+const otpStore = new Map();
+const resetStore = new Map();
+
+const pool = mysql.createPool(DB_CONFIG);
 
 const transporter = nodemailer.createTransport({
     host: SMTP.host,
@@ -42,66 +62,17 @@ const transporter = nodemailer.createTransport({
     tls: { rejectUnauthorized: false }
 });
 
-/* ---- Supabase helpers ---- */
-function supabaseRequest(method, path, body) {
-    return new Promise((resolve, reject) => {
-        const bodyStr = body ? JSON.stringify(body) : null;
-        const options = {
-            hostname: 'ahwafopsbwgevogeezqu.supabase.co',
-            path,
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_KEY,
-                'Authorization': 'Bearer ' + SUPABASE_KEY,
-                'Prefer': 'return=representation'
-            }
-        };
-        if (bodyStr) options.headers['Content-Length'] = Buffer.byteLength(bodyStr);
-        const req = https.request(options, (res) => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-                try { resolve({ status: res.statusCode, data: data ? JSON.parse(data) : null }); }
-                catch (e) { resolve({ status: res.statusCode, data: null }); }
-            });
-        });
-        req.on('error', reject);
-        if (bodyStr) req.write(bodyStr);
-        req.end();
-    });
-}
-
-function supabaseInsert(table, record) {
-    return supabaseRequest('POST', '/rest/v1/' + table, record).then(r => {
-        if (r.status >= 200 && r.status < 300) return r.data;
-        throw new Error('Supabase insert error ' + r.status + ': ' + JSON.stringify(r.data));
-    });
-}
-
-function supabaseQuery(table, filter) {
-    return supabaseRequest('GET', '/rest/v1/' + table + '?' + filter).then(r => {
-        if (r.status >= 200 && r.status < 300) return r.data;
-        throw new Error('Supabase query error ' + r.status + ': ' + JSON.stringify(r.data));
-    });
-}
-
-/* ---- Email template ---- */
-function buildEmail(toEmail, verifyLink) {
-    return {
-        from: '"EPIC Hackathon Singapore" <' + SMTP.auth.user + '>',
-        to: toEmail,
-        subject: 'Verify your EPIC Hackathon registration',
-        html: '<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;"><tr><td style="background:#000;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.07);"><span style="font-size:22px;font-weight:900;color:#fff;">EPIC</span><span style="font-size:13px;color:rgba(255,255,255,0.4);margin-left:12px;">Hackathon Singapore</span></td></tr><tr><td style="padding:36px 36px 28px;"><h1 style="font-size:24px;font-weight:800;color:#fff;margin:0 0 12px;">Verify your email address</h1><p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 24px;">Thanks for registering for EPIC Hackathon Singapore!<br/>Click the button below to verify your email and complete your registration.</p><a href="' + verifyLink + '" style="display:inline-block;background:#fff;color:#000;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;text-decoration:none;">Verify Email &amp; Complete Registration &#8594;</a><p style="font-size:13px;color:rgba(255,255,255,0.35);margin:24px 0 0;line-height:1.6;">This link expires in <strong style="color:rgba(255,255,255,0.55);">24 hours</strong>.<br/>If you did not register, you can safely ignore this email.</p></td></tr><tr><td style="padding:0 36px 28px;"><p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">Or copy this link: <a href="' + verifyLink + '" style="color:rgba(255,255,255,0.45);">' + verifyLink + '</a></p></td></tr><tr><td style="background:rgba(255,255,255,0.025);padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);"><p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">&copy; 2026 EPIC Hackathon Singapore &nbsp;&middot;&nbsp;<a href="' + BASE_URL + '" style="color:rgba(255,255,255,0.35);text-decoration:none;">Visit Website</a></p></td></tr></table></td></tr></table></body></html>'
-    };
-}
-
-/* ---- Helpers ---- */
 function parseBody(req) {
     return new Promise((resolve, reject) => {
         let body = '';
         req.on('data', chunk => body += chunk);
-        req.on('end', () => { try { resolve(JSON.parse(body)); } catch (e) { resolve({}); } });
+        req.on('end', () => {
+            try {
+                resolve(body ? JSON.parse(body) : {});
+            } catch (e) {
+                resolve({});
+            }
+        });
         req.on('error', reject);
     });
 }
@@ -118,35 +89,152 @@ function json(res, status, data) {
     res.end(JSON.stringify(data));
 }
 
-function hashPassword(pw) {
-    return crypto.createHash('sha256').update(pw).digest('hex');
+function redirect(res, location) {
+    setCORS(res);
+    res.writeHead(302, { Location: location });
+    res.end();
 }
 
-/* ---- HTTP Server ---- */
+function hashPassword(pw) {
+    return crypto.createHash('sha256').update(String(pw || '')).digest('hex');
+}
+
+function sanitizeOptional(value) {
+    if (value === undefined || value === null) return null;
+    const s = String(value).trim();
+    return s === '' ? null : s;
+}
+
+function normalizeUrlField(value, prefix) {
+    const s = sanitizeOptional(value);
+    if (!s) return null;
+    if (/^https?:\/\//i.test(s)) return s;
+    return prefix + s.replace(/^\/+/, '');
+}
+
+function mapUserRow(row) {
+    return {
+        email: row.email,
+        firstName: row.first_name || '',
+        lastName: row.last_name || '',
+        title: row.title || '',
+        bio: row.bio || '',
+        github: row.github || '',
+        linkedin: row.linkedin || '',
+        discord: row.discord || '',
+        website: row.website || '',
+        skills: row.skills || '',
+        teamStatus: row.team_status || 'solo',
+        age: row.age || '',
+        location: row.location || '',
+        twitterX: row.twitter_x || '',
+        rednote: row.rednote || '',
+        hackathonHistory: row.hackathon_history || ''
+    };
+}
+
+async function dbQuery(sql, params = []) {
+    const [rows] = await pool.query(sql, params);
+    return rows;
+}
+
+async function dbExecute(sql, params = []) {
+    const [result] = await pool.execute(sql, params);
+    return result;
+}
+
+async function userExists(email) {
+    const rows = await dbQuery('SELECT email FROM players WHERE email = ? LIMIT 1', [email]);
+    return rows.length > 0;
+}
+
+function buildVerifyEmail(toEmail, verifyLink) {
+    return {
+        from: '"EPIC Hackathon Singapore" <' + SMTP.auth.user + '>',
+        to: toEmail,
+        subject: 'Verify your EPIC Hackathon registration',
+        html: '<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;"><tr><td style="background:#000;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.07);"><span style="font-size:22px;font-weight:900;color:#fff;">EPIC</span><span style="font-size:13px;color:rgba(255,255,255,0.4);margin-left:12px;">Hackathon Singapore</span></td></tr><tr><td style="padding:36px 36px 28px;"><h1 style="font-size:24px;font-weight:800;color:#fff;margin:0 0 12px;">Verify your email address</h1><p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 24px;">Thanks for registering for EPIC Hackathon Singapore!<br/>Click the button below to verify your email and complete your registration.</p><a href="' + verifyLink + '" style="display:inline-block;background:#fff;color:#000;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;text-decoration:none;">Verify Email &amp; Complete Registration &#8594;</a><p style="font-size:13px;color:rgba(255,255,255,0.35);margin:24px 0 0;line-height:1.6;">This link expires in <strong style="color:rgba(255,255,255,0.55);">24 hours</strong>.<br/>If you did not register, you can safely ignore this email.</p></td></tr><tr><td style="padding:0 36px 28px;"><p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">Or copy this link: <a href="' + verifyLink + '" style="color:rgba(255,255,255,0.45);">' + verifyLink + '</a></p></td></tr><tr><td style="background:rgba(255,255,255,0.025);padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);"><p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">&copy; 2026 EPIC Hackathon Singapore &nbsp;&middot;&nbsp;<a href="' + BASE_URL + '" style="color:rgba(255,255,255,0.35);text-decoration:none;">Visit Website</a></p></td></tr></table></td></tr></table></body></html>'
+    };
+}
+
+function buildOtpEmail(email, code) {
+    return {
+        from: '"EPIC Hackathon Singapore" <' + SMTP.auth.user + '>',
+        to: email,
+        subject: 'Your EPIC sign-in code: ' + code,
+        html: '<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;"><tr><td style="background:#000;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.07);"><span style="font-size:22px;font-weight:900;color:#fff;">EPIC</span><span style="font-size:13px;color:rgba(255,255,255,0.4);margin-left:12px;">Hackathon Singapore</span></td></tr><tr><td style="padding:36px 36px 28px;"><h1 style="font-size:24px;font-weight:800;color:#fff;margin:0 0 12px;">Your sign-in code</h1><p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 28px;">Use the code below to sign in to your EPIC account. This code expires in <strong style="color:#fff;">10 minutes</strong>.</p><div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:16px;padding:28px;text-align:center;margin-bottom:24px;"><span style="font-size:48px;font-weight:900;letter-spacing:12px;color:#22C55E;font-family:monospace;">' + code + '</span></div><p style="font-size:13px;color:rgba(255,255,255,0.35);margin:0;line-height:1.6;">If you did not request this code, you can safely ignore this email. Do not share this code with anyone.</p></td></tr><tr><td style="background:rgba(255,255,255,0.025);padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);"><p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">&copy; 2026 EPIC Hackathon Singapore &nbsp;&middot;&nbsp;<a href="' + BASE_URL + '" style="color:rgba(255,255,255,0.35);text-decoration:none;">Visit Website</a></p></td></tr></table></td></tr></table></body></html>'
+    };
+}
+
+function buildResetPasswordEmail(email, firstName, resetLink) {
+    return {
+        from: '"EPIC Hackathon Singapore" <' + SMTP.auth.user + '>',
+        to: email,
+        subject: 'Reset your EPIC password',
+        html: '<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;"><tr><td style="background:#000;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.07);"><span style="font-size:22px;font-weight:900;color:#fff;">EPIC</span><span style="font-size:13px;color:rgba(255,255,255,0.4);margin-left:12px;">Hackathon Singapore</span></td></tr><tr><td style="padding:36px 36px 28px;"><h1 style="font-size:24px;font-weight:800;color:#fff;margin:0 0 12px;">Reset your password</h1><p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 8px;">Hi ' + firstName + ',</p><p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 28px;">We received a request to reset your EPIC account password. Click the button below to set a new password. This link expires in <strong style="color:#fff;">1 hour</strong>.</p><div style="text-align:center;margin-bottom:28px;"><a href="' + resetLink + '" style="display:inline-block;padding:16px 40px;background:#22C55E;color:#000;font-size:15px;font-weight:700;text-decoration:none;border-radius:12px;">Reset Password</a></div><p style="font-size:13px;color:rgba(255,255,255,0.35);margin:0 0 8px;line-height:1.6;">Or copy and paste this link into your browser:</p><p style="font-size:12px;color:rgba(255,255,255,0.25);word-break:break-all;margin:0;">' + resetLink + '</p></td></tr><tr><td style="background:rgba(255,255,255,0.025);padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);"><p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">If you did not request a password reset, you can safely ignore this email. &copy; 2026 EPIC Hackathon Singapore</p></td></tr></table></td></tr></table></body></html>'
+    };
+}
+
+async function ensureSchema() {
+    await dbExecute(`
+        CREATE TABLE IF NOT EXISTS players (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            password_hash VARCHAR(255) NOT NULL,
+            first_name VARCHAR(100) DEFAULT '',
+            last_name VARCHAR(100) DEFAULT '',
+            title VARCHAR(255) DEFAULT '',
+            bio TEXT,
+            github VARCHAR(255) DEFAULT NULL,
+            linkedin VARCHAR(255) DEFAULT NULL,
+            discord VARCHAR(255) DEFAULT NULL,
+            website VARCHAR(255) DEFAULT NULL,
+            skills TEXT,
+            team_status VARCHAR(50) DEFAULT 'solo',
+            verified TINYINT(1) NOT NULL DEFAULT 1,
+            age VARCHAR(50) DEFAULT '',
+            location VARCHAR(255) DEFAULT '',
+            twitter_x VARCHAR(255) DEFAULT '',
+            rednote VARCHAR(255) DEFAULT '',
+            hackathon_history TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+}
+
 const server = http.createServer(async (req, res) => {
-    const parsed   = url.parse(req.url, true);
+    const parsed = url.parse(req.url, true);
     const pathname = parsed.pathname;
 
-    if (req.method === 'OPTIONS') { setCORS(res); res.writeHead(204); res.end(); return; }
+    if (req.method === 'OPTIONS') {
+        setCORS(res);
+        res.writeHead(204);
+        res.end();
+        return;
+    }
 
-    /* POST /api/register */
     if (pathname === '/api/register' && req.method === 'POST') {
         try {
             const body = await parseBody(req);
-            const { email, password, firstName, lastName, role } = body;
-            if (!email || !password) return json(res, 400, { error: 'Email and password are required.' });
-            if (password.length < 8) return json(res, 400, { error: 'Password must be at least 8 characters.' });
+            const { email, password } = body;
 
-            // Check duplicate
-            const existing = await supabaseQuery('players', 'email=eq.' + encodeURIComponent(email) + '&select=email');
-            if (existing && existing.length > 0) return json(res, 409, { error: 'This email is already registered. Please sign in.' });
+            if (!email || !password) {
+                return json(res, 400, { error: 'Email and password are required.' });
+            }
+            if (String(password).length < 8) {
+                return json(res, 400, { error: 'Password must be at least 8 characters.' });
+            }
+            if (await userExists(email)) {
+                return json(res, 409, { error: 'This email is already registered. Please sign in.' });
+            }
 
-            const token     = crypto.randomBytes(32).toString('hex');
+            const token = crypto.randomBytes(32).toString('hex');
             const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
             pending.set(token, { data: body, expiresAt });
 
             const verifyLink = BASE_URL + '/api/verify?token=' + token;
-            await transporter.sendMail(buildEmail(email, verifyLink));
+            await transporter.sendMail(buildVerifyEmail(email, verifyLink));
             return json(res, 200, { ok: true, message: 'Verification email sent. Please check your inbox.' });
         } catch (err) {
             console.error('[register]', err.message);
@@ -154,94 +242,108 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    /* GET /api/verify */
     if (pathname === '/api/verify' && req.method === 'GET') {
-        const token = parsed.query.token;
-        if (!token || !pending.has(token)) {
-            setCORS(res); res.writeHead(302, { Location: BASE_URL + '/auth.html?error=invalid_token' }); res.end(); return;
-        }
-        const entry = pending.get(token);
-        if (Date.now() > entry.expiresAt) {
-            pending.delete(token);
-            setCORS(res); res.writeHead(302, { Location: BASE_URL + '/auth.html?error=token_expired' }); res.end(); return;
-        }
-        const { data } = entry;
-        pending.delete(token);
         try {
-            const pwHash = hashPassword(data.password);
-            await supabaseInsert('players', {
-                email:         data.email,
-                password_hash: pwHash,
-                first_name:    data.firstName  || '',
-                last_name:     data.lastName   || '',
-                title:         data.title      || '',
-                bio:           data.bio        || '',
-                github:        data.github     ? 'https://github.com/' + data.github : null,
-                linkedin:      data.linkedin   ? 'https://linkedin.com/in/' + data.linkedin : null,
-                discord:       data.discord    || null,
-                website:       data.website    || null,
-                skills:        data.skills     || null,
-                team_status:   data.teamStatus || 'solo',
-                verified:      true,
-                created_at:    new Date().toISOString()
-            });
-            // ✅ Redirect to login page with success notice
-            setCORS(res); res.writeHead(302, { Location: BASE_URL + '/auth.html?verified=1' }); res.end();
+            const token = parsed.query.token;
+            if (!token || !pending.has(token)) {
+                return redirect(res, BASE_URL + '/auth.html?error=invalid_token');
+            }
+
+            const entry = pending.get(token);
+            if (Date.now() > entry.expiresAt) {
+                pending.delete(token);
+                return redirect(res, BASE_URL + '/auth.html?error=token_expired');
+            }
+
+            const data = entry.data;
+            pending.delete(token);
+
+            if (await userExists(data.email)) {
+                return redirect(res, BASE_URL + '/auth.html?verified=1');
+            }
+
+            await dbExecute(
+                `INSERT INTO players (
+                    email, password_hash, first_name, last_name, title, bio,
+                    github, linkedin, discord, website, skills, team_status,
+                    verified, age, location, twitter_x, rednote, hackathon_history, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+                [
+                    data.email,
+                    hashPassword(data.password),
+                    sanitizeOptional(data.firstName) || '',
+                    sanitizeOptional(data.lastName) || '',
+                    sanitizeOptional(data.title) || '',
+                    sanitizeOptional(data.bio),
+                    normalizeUrlField(data.github, 'https://github.com/'),
+                    normalizeUrlField(data.linkedin, 'https://linkedin.com/in/'),
+                    sanitizeOptional(data.discord),
+                    sanitizeOptional(data.website),
+                    sanitizeOptional(data.skills),
+                    sanitizeOptional(data.teamStatus) || 'solo',
+                    1,
+                    sanitizeOptional(data.age) || '',
+                    sanitizeOptional(data.location) || '',
+                    sanitizeOptional(data.twitterX) || '',
+                    sanitizeOptional(data.rednote) || '',
+                    sanitizeOptional(data.hackathonHistory),
+                    new Date()
+                ]
+            );
+
+            return redirect(res, BASE_URL + '/auth.html?verified=1');
         } catch (err) {
             console.error('[verify]', err.message);
-            setCORS(res); res.writeHead(302, { Location: BASE_URL + '/auth.html?error=db_error' }); res.end();
+            return redirect(res, BASE_URL + '/auth.html?error=db_error');
         }
-        return;
     }
 
-    /* POST /api/login */
     if (pathname === '/api/login' && req.method === 'POST') {
         try {
             const body = await parseBody(req);
             const { email, password } = body;
-            if (!email || !password) return json(res, 400, { error: 'Email and password are required.' });
+            if (!email || !password) {
+                return json(res, 400, { error: 'Email and password are required.' });
+            }
 
-            const pwHash = hashPassword(password);
-            const rows = await supabaseQuery('players',
-                'email=eq.' + encodeURIComponent(email) +
-                '&password_hash=eq.' + pwHash +
-                '&verified=eq.true&select=email,first_name,last_name,title,bio,github,linkedin,discord,website,skills,team_status'
+            const rows = await dbQuery(
+                `SELECT email, first_name, last_name, title, bio, github, linkedin, discord, website,
+                        skills, team_status, age, location, twitter_x, rednote, hackathon_history
+                 FROM players
+                 WHERE email = ? AND password_hash = ? AND verified = 1
+                 LIMIT 1`,
+                [email, hashPassword(password)]
             );
-            if (!rows || rows.length === 0) return json(res, 401, { error: 'Invalid email or password.' });
 
-            const user = rows[0];
-            return json(res, 200, { ok: true, user: {
-                email:      user.email,
-                firstName:  user.first_name  || '',
-                lastName:   user.last_name   || '',
-                title:      user.title       || '',
-                bio:        user.bio         || '',
-                github:     user.github      || '',
-                linkedin:   user.linkedin    || '',
-                discord:    user.discord     || '',
-                website:    user.website     || '',
-                skills:     user.skills      || '',
-                teamStatus: user.team_status || 'solo'
-            } });
+            if (!rows.length) {
+                return json(res, 401, { error: 'Invalid email or password.' });
+            }
+
+            return json(res, 200, { ok: true, user: mapUserRow(rows[0]) });
         } catch (err) {
             console.error('[login]', err.message);
             return json(res, 500, { error: 'Login failed. Please try again.' });
         }
     }
 
-    /* POST /api/resend */
     if (pathname === '/api/resend' && req.method === 'POST') {
         try {
             const body = await parseBody(req);
             const { email } = body;
             let found = null;
             for (const [tok, entry] of pending.entries()) {
-                if (entry.data.email === email) { found = { tok, entry }; break; }
+                if (entry.data.email === email) {
+                    found = { tok, entry };
+                    break;
+                }
             }
-            if (!found) return json(res, 404, { error: 'No pending registration found for this email.' });
+            if (!found) {
+                return json(res, 404, { error: 'No pending registration found for this email.' });
+            }
+
             found.entry.expiresAt = Date.now() + 24 * 60 * 60 * 1000;
             const verifyLink = BASE_URL + '/api/verify?token=' + found.tok;
-            await transporter.sendMail(buildEmail(email, verifyLink));
+            await transporter.sendMail(buildVerifyEmail(email, verifyLink));
             return json(res, 200, { ok: true });
         } catch (err) {
             console.error('[resend]', err.message);
@@ -249,36 +351,27 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    /* POST /api/send-otp */
     if (pathname === '/api/send-otp' && req.method === 'POST') {
         try {
             const body = await parseBody(req);
             const { email } = body;
-            if (!email) return json(res, 400, { error: 'Email is required.' });
+            if (!email) {
+                return json(res, 400, { error: 'Email is required.' });
+            }
 
-            // Check user exists and is verified
-            const rows = await supabaseQuery('players',
-                'email=eq.' + encodeURIComponent(email) + '&verified=eq.true&select=email'
+            const rows = await dbQuery(
+                'SELECT email FROM players WHERE email = ? AND verified = 1 LIMIT 1',
+                [email]
             );
-            if (!rows || rows.length === 0) {
+            if (!rows.length) {
                 return json(res, 404, { error: 'No account found for this email. Please register first.' });
             }
 
-            // Generate 6-digit OTP
-            const code      = String(Math.floor(100000 + Math.random() * 900000));
-            const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+            const code = String(Math.floor(100000 + Math.random() * 900000));
+            const expiresAt = Date.now() + 10 * 60 * 1000;
             otpStore.set(email, { code, expiresAt, attempts: 0 });
 
-            // Send OTP email
-            const otpHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;"><tr><td style="background:#000;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.07);"><span style="font-size:22px;font-weight:900;color:#fff;">EPIC</span><span style="font-size:13px;color:rgba(255,255,255,0.4);margin-left:12px;">Hackathon Singapore</span></td></tr><tr><td style="padding:36px 36px 28px;"><h1 style="font-size:24px;font-weight:800;color:#fff;margin:0 0 12px;">Your sign-in code</h1><p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 28px;">Use the code below to sign in to your EPIC account. This code expires in <strong style="color:#fff;">10 minutes</strong>.</p><div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:16px;padding:28px;text-align:center;margin-bottom:24px;"><span style="font-size:48px;font-weight:900;letter-spacing:12px;color:#22C55E;font-family:monospace;">' + code + '</span></div><p style="font-size:13px;color:rgba(255,255,255,0.35);margin:0;line-height:1.6;">If you did not request this code, you can safely ignore this email. Do not share this code with anyone.</p></td></tr><tr><td style="background:rgba(255,255,255,0.025);padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);"><p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">&copy; 2026 EPIC Hackathon Singapore &nbsp;&middot;&nbsp;<a href="' + BASE_URL + '" style="color:rgba(255,255,255,0.35);text-decoration:none;">Visit Website</a></p></td></tr></table></td></tr></table></body></html>';
-
-            await transporter.sendMail({
-                from: '"EPIC Hackathon Singapore" <' + SMTP.auth.user + '>',
-                to: email,
-                subject: 'Your EPIC sign-in code: ' + code,
-                html: otpHtml
-            });
-
+            await transporter.sendMail(buildOtpEmail(email, code));
             return json(res, 200, { ok: true, message: 'Verification code sent to ' + email });
         } catch (err) {
             console.error('[send-otp]', err.message);
@@ -286,22 +379,24 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    /* POST /api/verify-otp */
     if (pathname === '/api/verify-otp' && req.method === 'POST') {
         try {
             const body = await parseBody(req);
             const { email, code } = body;
-            if (!email || !code) return json(res, 400, { error: 'Email and code are required.' });
+            if (!email || !code) {
+                return json(res, 400, { error: 'Email and code are required.' });
+            }
 
             const entry = otpStore.get(email);
-            if (!entry) return json(res, 400, { error: 'No verification code found. Please request a new one.' });
-
+            if (!entry) {
+                return json(res, 400, { error: 'No verification code found. Please request a new one.' });
+            }
             if (Date.now() > entry.expiresAt) {
                 otpStore.delete(email);
                 return json(res, 400, { error: 'Verification code has expired. Please request a new one.' });
             }
 
-            entry.attempts++;
+            entry.attempts += 1;
             if (entry.attempts > 5) {
                 otpStore.delete(email);
                 return json(res, 429, { error: 'Too many attempts. Please request a new code.' });
@@ -313,108 +408,82 @@ const server = http.createServer(async (req, res) => {
 
             otpStore.delete(email);
 
-            // Fetch user info
-            const rows = await supabaseQuery('players',
-                'email=eq.' + encodeURIComponent(email) + '&select=email,first_name,last_name,title,bio,github,linkedin,discord,website,skills,team_status,age,location,twitter_x,rednote,hackathon_history'
+            const rows = await dbQuery(
+                `SELECT email, first_name, last_name, title, bio, github, linkedin, discord, website,
+                        skills, team_status, age, location, twitter_x, rednote, hackathon_history
+                 FROM players
+                 WHERE email = ?
+                 LIMIT 1`,
+                [email]
             );
-            const user = rows && rows[0] ? rows[0] : { email };
-            return json(res, 200, { ok: true, user: {
-                email:      user.email,
-                firstName:  user.first_name  || '',
-                lastName:   user.last_name   || '',
-                title:      user.title       || '',
-                bio:        user.bio         || '',
-                github:     user.github      || '',
-                linkedin:   user.linkedin    || '',
-                discord:    user.discord     || '',
-                website:    user.website     || '',
-                skills:     user.skills      || '',
-                teamStatus: user.team_status || 'solo'
-            } });
+            const user = rows[0] || { email };
+            return json(res, 200, { ok: true, user: mapUserRow(user) });
         } catch (err) {
             console.error('[verify-otp]', err.message);
             return json(res, 500, { error: 'Verification failed. Please try again.' });
         }
     }
 
-    /* POST /api/forgot-password */
     if (pathname === '/api/forgot-password' && req.method === 'POST') {
         try {
-            const body  = await parseBody(req);
+            const body = await parseBody(req);
             const { email } = body;
-            if (!email) return json(res, 400, { error: 'Email is required.' });
+            if (!email) {
+                return json(res, 400, { error: 'Email is required.' });
+            }
 
-            // Always respond 200 to avoid email enumeration
             json(res, 200, { ok: true });
 
-            // Check user exists and is verified (async, fire-and-forget)
-            // NOTE: response already sent above, do NOT call json() again after this
             (async () => {
                 try {
-                    const rows = await supabaseQuery('players',
-                        'email=eq.' + encodeURIComponent(email) + '&verified=eq.true&select=email,first_name'
+                    const rows = await dbQuery(
+                        'SELECT email, first_name FROM players WHERE email = ? AND verified = 1 LIMIT 1',
+                        [email]
                     );
-                    if (!rows || rows.length === 0) return; // silently ignore
+                    if (!rows.length) return;
 
-                    // Generate secure reset token (64 hex chars)
-                    const token     = crypto.randomBytes(32).toString('hex');
-                    const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
+                    const token = crypto.randomBytes(32).toString('hex');
+                    const expiresAt = Date.now() + 60 * 60 * 1000;
                     resetStore.set(token, { email, expiresAt });
 
                     const firstName = rows[0].first_name || 'there';
                     const resetLink = BASE_URL + '/auth.html?reset_token=' + token;
-
-                    const resetHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;"><tr><td style="background:#000;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.07);"><span style="font-size:22px;font-weight:900;color:#fff;">EPIC</span><span style="font-size:13px;color:rgba(255,255,255,0.4);margin-left:12px;">Hackathon Singapore</span></td></tr><tr><td style="padding:36px 36px 28px;"><h1 style="font-size:24px;font-weight:800;color:#fff;margin:0 0 12px;">Reset your password</h1><p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 8px;">Hi ' + firstName + ',</p><p style="font-size:15px;color:rgba(255,255,255,0.6);line-height:1.6;margin:0 0 28px;">We received a request to reset your EPIC account password. Click the button below to set a new password. This link expires in <strong style="color:#fff;">1 hour</strong>.</p><div style="text-align:center;margin-bottom:28px;"><a href="' + resetLink + '" style="display:inline-block;padding:16px 40px;background:#22C55E;color:#000;font-size:15px;font-weight:700;text-decoration:none;border-radius:12px;">Reset Password</a></div><p style="font-size:13px;color:rgba(255,255,255,0.35);margin:0 0 8px;line-height:1.6;">Or copy and paste this link into your browser:</p><p style="font-size:12px;color:rgba(255,255,255,0.25);word-break:break-all;margin:0;">' + resetLink + '</p></td></tr><tr><td style="background:rgba(255,255,255,0.025);padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);"><p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">If you did not request a password reset, you can safely ignore this email. &copy; 2026 EPIC Hackathon Singapore</p></td></tr></table></td></tr></table></body></html>';
-
-                    await transporter.sendMail({
-                        from: '"EPIC Hackathon Singapore" <' + SMTP.auth.user + '>',
-                        to: email,
-                        subject: 'Reset your EPIC password',
-                        html: resetHtml
-                    });
+                    await transporter.sendMail(buildResetPasswordEmail(email, firstName, resetLink));
                     console.log('[forgot-password] Reset email sent to', email);
                 } catch (err) {
                     console.error('[forgot-password async]', err.message);
                 }
             })();
-
-            return; // response already sent above
+            return;
         } catch (err) {
             console.error('[forgot-password]', err.message);
             return json(res, 500, { error: 'Server error. Please try again.' });
         }
     }
 
-    /* POST /api/reset-password */
     if (pathname === '/api/reset-password' && req.method === 'POST') {
         try {
             const body = await parseBody(req);
             const { token, password } = body;
-            if (!token || !password) return json(res, 400, { error: 'Token and password are required.' });
-            if (password.length < 8)  return json(res, 400, { error: 'Password must be at least 8 characters.' });
+            if (!token || !password) {
+                return json(res, 400, { error: 'Token and password are required.' });
+            }
+            if (String(password).length < 8) {
+                return json(res, 400, { error: 'Password must be at least 8 characters.' });
+            }
 
             const entry = resetStore.get(token);
-            if (!entry) return json(res, 400, { error: 'Invalid or expired reset link. Please request a new one.' });
-
+            if (!entry) {
+                return json(res, 400, { error: 'Invalid or expired reset link. Please request a new one.' });
+            }
             if (Date.now() > entry.expiresAt) {
                 resetStore.delete(token);
                 return json(res, 400, { error: 'This reset link has expired. Please request a new one.' });
             }
 
-            const { email } = entry;
-
-            // Hash new password (SHA-256, same as registration)
-            const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
-
-            // Update password in Supabase
-            await supabaseRequest('PATCH',
-                '/rest/v1/players?email=eq.' + encodeURIComponent(email),
-                { password_hash: passwordHash }
-            );
-
+            await dbExecute('UPDATE players SET password_hash = ? WHERE email = ?', [hashPassword(password), entry.email]);
             resetStore.delete(token);
-            console.log('[reset-password] Password updated for', email);
-
+            console.log('[reset-password] Password updated for', entry.email);
             return json(res, 200, { ok: true, message: 'Password updated successfully.' });
         } catch (err) {
             console.error('[reset-password]', err.message);
@@ -422,78 +491,77 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    /* GET /api/profile?email=xxx */
     if (pathname === '/api/profile' && req.method === 'GET') {
         try {
             const email = parsed.query.email;
-            if (!email) return json(res, 400, { error: 'Email is required.' });
+            if (!email) {
+                return json(res, 400, { error: 'Email is required.' });
+            }
 
-            const rows = await supabaseQuery('players',
-                'email=eq.' + encodeURIComponent(email) + '&select=email,first_name,last_name,title,bio,github,linkedin,discord,website,skills,team_status,age,location,twitter_x,rednote,hackathon_history'
+            const rows = await dbQuery(
+                `SELECT email, first_name, last_name, title, bio, github, linkedin, discord, website,
+                        skills, team_status, age, location, twitter_x, rednote, hackathon_history
+                 FROM players
+                 WHERE email = ?
+                 LIMIT 1`,
+                [email]
             );
-            if (!rows || rows.length === 0) return json(res, 404, { error: 'User not found.' });
 
-            const u = rows[0];
-            return json(res, 200, {
-                email:      u.email,
-                firstName:  u.first_name  || '',
-                lastName:   u.last_name   || '',
-                title:      u.title       || '',
-                bio:        u.bio         || '',
-                github:     u.github      || '',
-                linkedin:   u.linkedin    || '',
-                discord:    u.discord     || '',
-                website:    u.website     || '',
-                skills:     u.skills      || '',
-                teamStatus:       u.team_status       || 'solo',
-                age:              u.age              || '',
-                location:         u.location         || '',
-                twitterX:         u.twitter_x        || '',
-                rednote:          u.rednote          || '',
-                hackathonHistory: u.hackathon_history || '',
-            });
+            if (!rows.length) {
+                return json(res, 404, { error: 'User not found.' });
+            }
+
+            return json(res, 200, mapUserRow(rows[0]));
         } catch (err) {
             console.error('[get-profile]', err.message);
             return json(res, 500, { error: 'Failed to load profile.' });
         }
     }
 
-    /* POST /api/profile — update profile fields */
     if (pathname === '/api/profile' && req.method === 'POST') {
         try {
             const body = await parseBody(req);
             const { email } = body;
-            if (!email) return json(res, 400, { error: 'Email is required.' });
+            if (!email) {
+                return json(res, 400, { error: 'Email is required.' });
+            }
 
-            // Build update object with only provided fields
             const update = {};
-            if (body.firstName  !== undefined) update.first_name   = body.firstName;
-            if (body.lastName   !== undefined) update.last_name    = body.lastName;
-            if (body.title      !== undefined) update.title        = body.title;
-            if (body.bio        !== undefined) update.bio          = body.bio;
-            if (body.github     !== undefined) update.github       = body.github;
-            if (body.linkedin   !== undefined) update.linkedin     = body.linkedin;
-            if (body.discord    !== undefined) update.discord      = body.discord;
-            if (body.website    !== undefined) update.website      = body.website;
-            if (body.skills           !== undefined) update.skills            = body.skills;
-            if (body.teamStatus       !== undefined) update.team_status       = body.teamStatus;
-            if (body.age              !== undefined) update.age               = body.age;
-            if (body.location         !== undefined) update.location          = body.location;
-            if (body.twitterX         !== undefined) update.twitter_x         = body.twitterX;
-            if (body.rednote          !== undefined) update.rednote           = body.rednote;
-            if (body.hackathonHistory !== undefined) update.hackathon_history = body.hackathonHistory;
+            if (body.firstName !== undefined) update.first_name = String(body.firstName);
+            if (body.lastName !== undefined) update.last_name = String(body.lastName);
+            if (body.title !== undefined) update.title = String(body.title);
+            if (body.bio !== undefined) update.bio = String(body.bio);
+            if (body.github !== undefined) update.github = String(body.github);
+            if (body.linkedin !== undefined) update.linkedin = String(body.linkedin);
+            if (body.discord !== undefined) update.discord = String(body.discord);
+            if (body.website !== undefined) update.website = String(body.website);
+            if (body.skills !== undefined) update.skills = String(body.skills);
+            if (body.teamStatus !== undefined) update.team_status = String(body.teamStatus);
+            if (body.age !== undefined) update.age = String(body.age);
+            if (body.location !== undefined) update.location = String(body.location);
+            if (body.twitterX !== undefined) update.twitter_x = String(body.twitterX);
+            if (body.rednote !== undefined) update.rednote = String(body.rednote);
+            if (body.hackathonHistory !== undefined) update.hackathon_history = String(body.hackathonHistory);
 
-            if (Object.keys(update).length === 0) return json(res, 400, { error: 'No fields to update.' });
-            // Validate required fields if provided
-            if (update.first_name !== undefined && !update.first_name.trim())
+            if (Object.keys(update).length === 0) {
+                return json(res, 400, { error: 'No fields to update.' });
+            }
+            if (update.first_name !== undefined && !update.first_name.trim()) {
                 return json(res, 400, { error: 'First name cannot be empty.' });
-            if (update.last_name !== undefined && !update.last_name.trim())
+            }
+            if (update.last_name !== undefined && !update.last_name.trim()) {
                 return json(res, 400, { error: 'Last name cannot be empty.' });
+            }
 
-            await supabaseRequest('PATCH',
-                '/rest/v1/players?email=eq.' + encodeURIComponent(email),
-                update
-            );
+            const fields = [];
+            const values = [];
+            for (const [key, value] of Object.entries(update)) {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            }
+            values.push(email);
+
+            await dbExecute(`UPDATE players SET ${fields.join(', ')} WHERE email = ?`, values);
             console.log('[profile] Updated profile for', email);
             return json(res, 200, { ok: true });
         } catch (err) {
@@ -502,34 +570,29 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    /* POST /api/change-password — verify current password then update */
     if (pathname === '/api/change-password' && req.method === 'POST') {
         try {
             const body = await parseBody(req);
             const { email, currentPassword, newPassword } = body;
-            if (!email || !currentPassword || !newPassword)
+            if (!email || !currentPassword || !newPassword) {
                 return json(res, 400, { error: 'All fields are required.' });
-            if (newPassword.length < 8)
+            }
+            if (String(newPassword).length < 8) {
                 return json(res, 400, { error: 'New password must be at least 8 characters.' });
-            if (currentPassword === newPassword)
+            }
+            if (currentPassword === newPassword) {
                 return json(res, 400, { error: 'New password must be different from your current password.' });
+            }
 
-            // Verify current password
-            const currentHash = hashPassword(currentPassword);
-            const rows = await supabaseQuery('players',
-                'email=eq.' + encodeURIComponent(email) +
-                '&password_hash=eq.' + currentHash +
-                '&select=email'
+            const rows = await dbQuery(
+                'SELECT email FROM players WHERE email = ? AND password_hash = ? LIMIT 1',
+                [email, hashPassword(currentPassword)]
             );
-            if (!rows || rows.length === 0)
+            if (!rows.length) {
                 return json(res, 401, { error: 'Current password is incorrect.' });
+            }
 
-            // Update to new password
-            const newHash = hashPassword(newPassword);
-            await supabaseRequest('PATCH',
-                '/rest/v1/players?email=eq.' + encodeURIComponent(email),
-                { password_hash: newHash }
-            );
+            await dbExecute('UPDATE players SET password_hash = ? WHERE email = ?', [hashPassword(newPassword), email]);
             console.log('[change-password] Password changed for', email);
             return json(res, 200, { ok: true });
         } catch (err) {
@@ -538,29 +601,19 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    json(res, 404, { error: 'Not found' });
+    return json(res, 404, { error: 'Not found' });
 });
 
-/* ---- Auto-migrate: add new columns if missing ---- */
-async function autoMigrate() {
+(async () => {
     try {
-        // Test if new columns exist by querying one row
-        const r = await supabaseRequest('GET',
-            '/rest/v1/players?select=age,location,twitter_x,rednote,hackathon_history&limit=1'
-        );
-        if (r.status === 200) {
-            console.log('[migrate] New profile columns already exist.');
-            return;
-        }
-        // Columns missing — log SQL for manual execution
-        console.warn('[migrate] New columns not found (HTTP ' + r.status + '). Please run the following SQL in Supabase dashboard:');
-        console.warn('ALTER TABLE players ADD COLUMN IF NOT EXISTS age TEXT, ADD COLUMN IF NOT EXISTS location TEXT, ADD COLUMN IF NOT EXISTS twitter_x TEXT, ADD COLUMN IF NOT EXISTS rednote TEXT, ADD COLUMN IF NOT EXISTS hackathon_history TEXT;');
-    } catch (e) {
-        console.error('[migrate]', e.message);
+        await ensureSchema();
+        await dbQuery('SELECT 1 AS ok');
+        server.listen(PORT, () => {
+            console.log('[EPIC API] Listening on port ' + PORT);
+            console.log('[DB] Connected to MariaDB at ' + DB_CONFIG.host + ':' + DB_CONFIG.port + '/' + DB_CONFIG.database);
+        });
+    } catch (err) {
+        console.error('[startup]', err.message);
+        process.exit(1);
     }
-}
-
-server.listen(PORT, () => {
-    console.log('[EPIC API] Listening on port ' + PORT);
-    autoMigrate();
-});
+})();
