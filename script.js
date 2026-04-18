@@ -353,10 +353,174 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initScrollReveal();
     initSmoothScroll();
+    initMagicRingsBackground();
     // Apply saved language on load
     updateLanguage();
     updateLangUI();
 });
+
+function initMagicRingsBackground() {
+    const canvas = document.getElementById('magic-rings-canvas');
+    const hero = document.querySelector('.hero');
+    if (!canvas || !hero) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const config = {
+        color: '#A855F7',
+        colorTwo: '#6366F1',
+        ringCount: 6,
+        speed: 1,
+        attenuation: 10,
+        lineThickness: 2,
+        baseRadius: 0.35,
+        radiusStep: 0.1,
+        scaleRate: 0.1,
+        opacity: 1,
+        noiseAmount: 0.1,
+        rotation: 0,
+        ringGap: 1.5,
+        fadeIn: 0.7,
+        fadeOut: 0.5,
+        followMouse: false,
+        mouseInfluence: 0.2,
+        hoverScale: 1.2,
+        parallax: 0.05,
+        clickBurst: false
+    };
+
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let rafId = null;
+
+    const hexToRgb = (hex) => {
+        const clean = hex.replace('#', '');
+        const full = clean.length === 3
+            ? clean.split('').map((char) => char + char).join('')
+            : clean;
+        const num = Number.parseInt(full, 16);
+        return {
+            r: (num >> 16) & 255,
+            g: (num >> 8) & 255,
+            b: num & 255
+        };
+    };
+
+    const mix = (a, b, t) => ({
+        r: a.r + (b.r - a.r) * t,
+        g: a.g + (b.g - a.g) * t,
+        b: a.b + (b.b - a.b) * t
+    });
+
+    const primary = hexToRgb(config.color);
+    const secondary = hexToRgb(config.colorTwo);
+
+    function resize() {
+        const bounds = hero.getBoundingClientRect();
+        width = Math.max(1, Math.floor(bounds.width));
+        height = Math.max(1, Math.floor(bounds.height));
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function ringAlpha(progress) {
+        if (progress < config.fadeIn) {
+            return Math.max(0, Math.min(1, progress / config.fadeIn));
+        }
+        const tail = Math.max(0.001, 1 - config.fadeOut);
+        return Math.max(0, Math.min(1, 1 - ((progress - config.fadeOut) / tail)));
+    }
+
+    function drawNoise() {
+        const count = Math.floor((width * height) / 18000 * config.noiseAmount * 18);
+        ctx.save();
+        for (let i = 0; i < count; i++) {
+            const x = Math.random() * width;
+            const y = Math.random() * height;
+            const alpha = Math.random() * 0.03;
+            ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+            ctx.fillRect(x, y, 1.2, 1.2);
+        }
+        ctx.restore();
+    }
+
+    function render(now) {
+        if (prefersReducedMotion.matches) {
+            ctx.clearRect(0, 0, width, height);
+        } else {
+            rafId = requestAnimationFrame(render);
+            ctx.clearRect(0, 0, width, height);
+        }
+
+        const time = (now || 0) * 0.001 * config.speed;
+        const cx = width * 0.5;
+        const cy = height * 0.45;
+        const baseSize = Math.min(width, height);
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate((config.rotation * Math.PI) / 180);
+        ctx.globalCompositeOperation = 'lighter';
+
+        for (let i = 0; i < config.ringCount; i++) {
+            const progress = (time * 0.28 + i / config.ringCount) % 1;
+            const radius = baseSize * (config.baseRadius + i * config.radiusStep + progress * config.scaleRate);
+            const fade = ringAlpha(progress);
+            const color = mix(primary, secondary, config.ringCount === 1 ? 0 : i / (config.ringCount - 1));
+            const gapFactor = Math.pow(config.ringGap, i) * 0.018;
+            const start = -Math.PI * (0.9 - gapFactor);
+            const end = Math.PI * (0.9 - gapFactor * 0.7);
+
+            ctx.save();
+            ctx.rotate((i * 0.26) + time * 0.1);
+            ctx.shadowBlur = config.attenuation * 2.8;
+            ctx.shadowColor = `rgba(${color.r}, ${color.g}, ${color.b}, ${0.35 * fade})`;
+            ctx.lineWidth = Math.max(1, config.lineThickness + i * 0.18);
+            ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${Math.max(0, fade * (0.2 + config.opacity * 0.65))})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, start, end, false);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        const coreGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, baseSize * 0.3);
+        coreGradient.addColorStop(0, 'rgba(168, 85, 247, 0.18)');
+        coreGradient.addColorStop(0.45, 'rgba(99, 102, 241, 0.12)');
+        coreGradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+        ctx.fillStyle = coreGradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, baseSize * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+        drawNoise();
+    }
+
+    resize();
+    if (prefersReducedMotion.matches) {
+        render(0);
+    } else {
+        rafId = requestAnimationFrame(render);
+    }
+
+    const onResize = () => {
+        resize();
+        if (prefersReducedMotion.matches) render(0);
+    };
+
+    window.addEventListener('resize', onResize);
+
+    if (prefersReducedMotion.addEventListener) {
+        prefersReducedMotion.addEventListener('change', onResize);
+    }
+}
 
 /**
  * Navigation scroll effect

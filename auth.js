@@ -3,7 +3,7 @@
  * auth.js  (v4 — dual sign-in: password + OTP)
  */
 
-const API_BASE = '/api';
+const API_BASE = `${window.location.protocol}//${window.location.hostname}:3002/api`;
 
 let pendingEmail    = null;
 let otpCountdownTimer = null;

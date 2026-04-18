@@ -78,20 +78,40 @@ function parseBody(req) {
     });
 }
 
-function setCORS(res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+function setCORS(req, res) {
+    const origin = req.headers.origin || '*';
+    const reqHeaders = req.headers['access-control-request-headers'] || 'Content-Type';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin, Access-Control-Request-Headers');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', reqHeaders);
+    res.setHeader('Access-Control-Max-Age', '86400');
 }
 
-function json(res, status, data) {
-    setCORS(res);
+function sendPreflight(req, res) {
+    setCORS(req, res);
+    res.statusCode = 204;
+    res.setHeader('Content-Length', '0');
+    res.end();
+}
+
+function json(arg1, arg2, arg3, arg4) {
+    const hasReq = typeof arg4 !== 'undefined';
+    const req = hasReq ? arg1 : { headers: {} };
+    const res = hasReq ? arg2 : arg1;
+    const status = hasReq ? arg3 : arg2;
+    const data = hasReq ? arg4 : arg3;
+    setCORS(req, res);
     res.writeHead(status, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(data));
 }
 
-function redirect(res, location) {
-    setCORS(res);
+function redirect(arg1, arg2, arg3) {
+    const hasReq = typeof arg3 !== 'undefined';
+    const req = hasReq ? arg1 : { headers: {} };
+    const res = hasReq ? arg2 : arg1;
+    const location = hasReq ? arg3 : arg2;
+    setCORS(req, res);
     res.writeHead(302, { Location: location });
     res.end();
 }
@@ -393,9 +413,7 @@ const server = http.createServer(async (req, res) => {
     const pathname = parsed.pathname;
 
     if (req.method === 'OPTIONS') {
-        setCORS(res);
-        res.writeHead(204);
-        res.end();
+        sendPreflight(req, res);
         return;
     }
 
