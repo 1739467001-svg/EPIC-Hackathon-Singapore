@@ -344,7 +344,7 @@ const i18n = {
 };
 
 // State
-let currentLang = localStorage.getItem('epic_lang') || 'en';
+let currentLang = localStorage.getItem('epic_lang') || 'zh';
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -354,10 +354,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initScrollReveal();
     initSmoothScroll();
     // Apply saved language on load
-    if (currentLang !== 'en') {
-        updateLanguage();
-        updateLangUI();
-    }
+    updateLanguage();
+    updateLangUI();
 });
 
 /**

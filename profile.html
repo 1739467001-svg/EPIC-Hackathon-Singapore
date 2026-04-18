@@ -898,7 +898,7 @@
 </div>
 
 <script>
-const API_BASE = '/api';
+const API_BASE = `${window.location.protocol}//${window.location.hostname}:3002/api`;
 let currentUser = null;
 let skillsList = [];
 
@@ -1356,7 +1356,7 @@ const profileI18n = {
     }
 };
 
-let profileLang = localStorage.getItem('epic_lang') || 'en';
+let profileLang = localStorage.getItem('epic_lang') || 'zh';
 
 function applyProfileLang(lang) {
     profileLang = lang;
