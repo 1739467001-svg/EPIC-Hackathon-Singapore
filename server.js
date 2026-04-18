@@ -1,30 +1,28 @@
 /**
  * EPIC Hackathon Singapore — Registration API Server
  *
- * Endpoints:
- *  POST /api/register        — store pending registration, send verification email
- *  GET  /api/verify          — verify token, write to MariaDB, redirect to login
- *  POST /api/resend          — resend verification email
- *  POST /api/login           — verify email+password, return user info
- *  POST /api/send-otp        — send one-time code for passwordless login
- *  POST /api/verify-otp      — verify one-time code and return user info
- *  POST /api/forgot-password — send password reset email
- *  POST /api/reset-password  — reset password by token
- *  GET  /api/profile         — fetch user profile by email
- *  POST /api/profile         — update user profile fields
- *  POST /api/change-password — change password after verifying current password
+ * This server supports two data providers while keeping the same API routes
+ * and payload field naming for the frontend:
+ *   - supabase (existing implementation)
+ *   - mariadb  (new additive implementation)
  *
- * Port: 3001
+ * Switch provider with DB_PROVIDER=supabase|mariadb
+ * Default: supabase
  */
 
 const http = require('http');
+const https = require('https');
+const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const url = require('url');
-const nodemailer = require('nodemailer');
 const mysql = require('mysql2/promise');
 
 const PORT = Number(process.env.PORT || 3001);
 const BASE_URL = process.env.BASE_URL || 'https://evol.epicconnector.ai';
+const DB_PROVIDER = (process.env.DB_PROVIDER || 'supabase').toLowerCase();
+
+const SUPABASE_HOST = process.env.SUPABASE_HOST || 'ahwafopsbwgevogeezqu.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFod2Fmb3BzYndnZXZvZ2VlenF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQ5MTYsImV4cCI6MjA5MTY3MDkxNn0.wK7fZDyFaA39et0szUmMfvKVXgXTsrMxxt2Yo-ctFp0';
 
 const DB_CONFIG = {
     host: process.env.DB_HOST || '127.0.0.1',
@@ -52,8 +50,6 @@ const pending = new Map();
 const otpStore = new Map();
 const resetStore = new Map();
 
-const pool = mysql.createPool(DB_CONFIG);
-
 const transporter = nodemailer.createTransport({
     host: SMTP.host,
     port: SMTP.port,
@@ -61,6 +57,11 @@ const transporter = nodemailer.createTransport({
     auth: SMTP.auth,
     tls: { rejectUnauthorized: false }
 });
+
+let pool = null;
+if (DB_PROVIDER === 'mariadb') {
+    pool = mysql.createPool(DB_CONFIG);
+}
 
 function parseBody(req) {
     return new Promise((resolve, reject) => {
@@ -133,6 +134,58 @@ function mapUserRow(row) {
     };
 }
 
+function mapUserToResponse(row) {
+    return { ok: true, user: mapUserRow(row) };
+}
+
+/* ---------- Supabase helpers ---------- */
+function supabaseRequest(method, path, body) {
+    return new Promise((resolve, reject) => {
+        const bodyStr = body ? JSON.stringify(body) : null;
+        const options = {
+            hostname: SUPABASE_HOST,
+            path,
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_KEY,
+                'Authorization': 'Bearer ' + SUPABASE_KEY,
+                'Prefer': 'return=representation'
+            }
+        };
+        if (bodyStr) options.headers['Content-Length'] = Buffer.byteLength(bodyStr);
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    resolve({ status: res.statusCode, data: data ? JSON.parse(data) : null });
+                } catch (e) {
+                    resolve({ status: res.statusCode, data: null });
+                }
+            });
+        });
+        req.on('error', reject);
+        if (bodyStr) req.write(bodyStr);
+        req.end();
+    });
+}
+
+function supabaseInsert(table, record) {
+    return supabaseRequest('POST', '/rest/v1/' + table, record).then(r => {
+        if (r.status >= 200 && r.status < 300) return r.data;
+        throw new Error('Supabase insert error ' + r.status + ': ' + JSON.stringify(r.data));
+    });
+}
+
+function supabaseQuery(table, filter) {
+    return supabaseRequest('GET', '/rest/v1/' + table + '?' + filter).then(r => {
+        if (r.status >= 200 && r.status < 300) return r.data;
+        throw new Error('Supabase query error ' + r.status + ': ' + JSON.stringify(r.data));
+    });
+}
+
+/* ---------- MariaDB helpers ---------- */
 async function dbQuery(sql, params = []) {
     const [rows] = await pool.query(sql, params);
     return rows;
@@ -143,9 +196,169 @@ async function dbExecute(sql, params = []) {
     return result;
 }
 
-async function userExists(email) {
-    const rows = await dbQuery('SELECT email FROM players WHERE email = ? LIMIT 1', [email]);
-    return rows.length > 0;
+async function ensureMariaDbSchema() {
+    if (DB_PROVIDER !== 'mariadb') return;
+    await dbExecute(`
+        CREATE TABLE IF NOT EXISTS players (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            password_hash VARCHAR(255) NOT NULL,
+            first_name VARCHAR(100) DEFAULT '',
+            last_name VARCHAR(100) DEFAULT '',
+            title VARCHAR(255) DEFAULT '',
+            bio TEXT,
+            github VARCHAR(255) DEFAULT NULL,
+            linkedin VARCHAR(255) DEFAULT NULL,
+            discord VARCHAR(255) DEFAULT NULL,
+            website VARCHAR(255) DEFAULT NULL,
+            skills TEXT,
+            team_status VARCHAR(50) DEFAULT 'solo',
+            verified TINYINT(1) NOT NULL DEFAULT 1,
+            age VARCHAR(50) DEFAULT '',
+            location VARCHAR(255) DEFAULT '',
+            twitter_x VARCHAR(255) DEFAULT '',
+            rednote VARCHAR(255) DEFAULT '',
+            hackathon_history TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+}
+
+async function findUserByEmail(email) {
+    if (DB_PROVIDER === 'mariadb') {
+        const rows = await dbQuery(
+            `SELECT email, first_name, last_name, title, bio, github, linkedin, discord, website,
+                    skills, team_status, age, location, twitter_x, rednote, hackathon_history, verified, password_hash
+             FROM players WHERE email = ? LIMIT 1`,
+            [email]
+        );
+        return rows[0] || null;
+    }
+    const rows = await supabaseQuery(
+        'players',
+        'email=eq.' + encodeURIComponent(email) + '&select=email,first_name,last_name,title,bio,github,linkedin,discord,website,skills,team_status,age,location,twitter_x,rednote,hackathon_history,verified,password_hash'
+    );
+    return rows && rows[0] ? rows[0] : null;
+}
+
+async function createUserFromRegistration(data) {
+    const record = {
+        email: data.email,
+        password_hash: hashPassword(data.password),
+        first_name: data.firstName || '',
+        last_name: data.lastName || '',
+        title: data.title || '',
+        bio: data.bio || '',
+        github: data.github ? normalizeUrlField(data.github, 'https://github.com/') : null,
+        linkedin: data.linkedin ? normalizeUrlField(data.linkedin, 'https://linkedin.com/in/') : null,
+        discord: data.discord || null,
+        website: data.website || null,
+        skills: data.skills || null,
+        team_status: data.teamStatus || 'solo',
+        verified: true,
+        age: data.age || '',
+        location: data.location || '',
+        twitter_x: data.twitterX || '',
+        rednote: data.rednote || '',
+        hackathon_history: data.hackathonHistory || '',
+        created_at: new Date().toISOString()
+    };
+
+    if (DB_PROVIDER === 'mariadb') {
+        await dbExecute(
+            `INSERT INTO players (
+                email, password_hash, first_name, last_name, title, bio,
+                github, linkedin, discord, website, skills, team_status,
+                verified, age, location, twitter_x, rednote, hackathon_history, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                record.email,
+                record.password_hash,
+                record.first_name,
+                record.last_name,
+                record.title,
+                record.bio,
+                record.github,
+                record.linkedin,
+                record.discord,
+                record.website,
+                record.skills,
+                record.team_status,
+                1,
+                record.age,
+                record.location,
+                record.twitter_x,
+                record.rednote,
+                record.hackathon_history,
+                new Date()
+            ]
+        );
+        return;
+    }
+
+    await supabaseInsert('players', record);
+}
+
+async function findVerifiedUserByLogin(email, passwordHash) {
+    if (DB_PROVIDER === 'mariadb') {
+        const rows = await dbQuery(
+            `SELECT email, first_name, last_name, title, bio, github, linkedin, discord, website,
+                    skills, team_status, age, location, twitter_x, rednote, hackathon_history
+             FROM players
+             WHERE email = ? AND password_hash = ? AND verified = 1
+             LIMIT 1`,
+            [email, passwordHash]
+        );
+        return rows[0] || null;
+    }
+    const rows = await supabaseQuery(
+        'players',
+        'email=eq.' + encodeURIComponent(email) +
+        '&password_hash=eq.' + passwordHash +
+        '&verified=eq.true&select=email,first_name,last_name,title,bio,github,linkedin,discord,website,skills,team_status,age,location,twitter_x,rednote,hackathon_history'
+    );
+    return rows && rows[0] ? rows[0] : null;
+}
+
+async function getProfileByEmail(email) {
+    if (DB_PROVIDER === 'mariadb') {
+        const rows = await dbQuery(
+            `SELECT email, first_name, last_name, title, bio, github, linkedin, discord, website,
+                    skills, team_status, age, location, twitter_x, rednote, hackathon_history
+             FROM players WHERE email = ? LIMIT 1`,
+            [email]
+        );
+        return rows[0] || null;
+    }
+    const rows = await supabaseQuery(
+        'players',
+        'email=eq.' + encodeURIComponent(email) + '&select=email,first_name,last_name,title,bio,github,linkedin,discord,website,skills,team_status,age,location,twitter_x,rednote,hackathon_history'
+    );
+    return rows && rows[0] ? rows[0] : null;
+}
+
+async function updateProfileByEmail(email, update) {
+    if (DB_PROVIDER === 'mariadb') {
+        const fields = [];
+        const values = [];
+        for (const [key, value] of Object.entries(update)) {
+            fields.push(`${key} = ?`);
+            values.push(value);
+        }
+        values.push(email);
+        await dbExecute(`UPDATE players SET ${fields.join(', ')} WHERE email = ?`, values);
+        return;
+    }
+    await supabaseRequest('PATCH', '/rest/v1/players?email=eq.' + encodeURIComponent(email), update);
+}
+
+async function updatePasswordByEmail(email, newHash) {
+    if (DB_PROVIDER === 'mariadb') {
+        await dbExecute('UPDATE players SET password_hash = ? WHERE email = ?', [newHash, email]);
+        return;
+    }
+    await supabaseRequest('PATCH', '/rest/v1/players?email=eq.' + encodeURIComponent(email), { password_hash: newHash });
 }
 
 function buildVerifyEmail(toEmail, verifyLink) {
@@ -175,34 +388,6 @@ function buildResetPasswordEmail(email, firstName, resetLink) {
     };
 }
 
-async function ensureSchema() {
-    await dbExecute(`
-        CREATE TABLE IF NOT EXISTS players (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            email VARCHAR(255) NOT NULL UNIQUE,
-            password_hash VARCHAR(255) NOT NULL,
-            first_name VARCHAR(100) DEFAULT '',
-            last_name VARCHAR(100) DEFAULT '',
-            title VARCHAR(255) DEFAULT '',
-            bio TEXT,
-            github VARCHAR(255) DEFAULT NULL,
-            linkedin VARCHAR(255) DEFAULT NULL,
-            discord VARCHAR(255) DEFAULT NULL,
-            website VARCHAR(255) DEFAULT NULL,
-            skills TEXT,
-            team_status VARCHAR(50) DEFAULT 'solo',
-            verified TINYINT(1) NOT NULL DEFAULT 1,
-            age VARCHAR(50) DEFAULT '',
-            location VARCHAR(255) DEFAULT '',
-            twitter_x VARCHAR(255) DEFAULT '',
-            rednote VARCHAR(255) DEFAULT '',
-            hackathon_history TEXT,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-}
-
 const server = http.createServer(async (req, res) => {
     const parsed = url.parse(req.url, true);
     const pathname = parsed.pathname;
@@ -218,16 +403,11 @@ const server = http.createServer(async (req, res) => {
         try {
             const body = await parseBody(req);
             const { email, password } = body;
+            if (!email || !password) return json(res, 400, { error: 'Email and password are required.' });
+            if (String(password).length < 8) return json(res, 400, { error: 'Password must be at least 8 characters.' });
 
-            if (!email || !password) {
-                return json(res, 400, { error: 'Email and password are required.' });
-            }
-            if (String(password).length < 8) {
-                return json(res, 400, { error: 'Password must be at least 8 characters.' });
-            }
-            if (await userExists(email)) {
-                return json(res, 409, { error: 'This email is already registered. Please sign in.' });
-            }
+            const existing = await findUserByEmail(email);
+            if (existing) return json(res, 409, { error: 'This email is already registered. Please sign in.' });
 
             const token = crypto.randomBytes(32).toString('hex');
             const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
@@ -243,54 +423,20 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/verify' && req.method === 'GET') {
-        try {
-            const token = parsed.query.token;
-            if (!token || !pending.has(token)) {
-                return redirect(res, BASE_URL + '/auth.html?error=invalid_token');
-            }
-
-            const entry = pending.get(token);
-            if (Date.now() > entry.expiresAt) {
-                pending.delete(token);
-                return redirect(res, BASE_URL + '/auth.html?error=token_expired');
-            }
-
-            const data = entry.data;
+        const token = parsed.query.token;
+        if (!token || !pending.has(token)) {
+            return redirect(res, BASE_URL + '/auth.html?error=invalid_token');
+        }
+        const entry = pending.get(token);
+        if (Date.now() > entry.expiresAt) {
             pending.delete(token);
-
-            if (await userExists(data.email)) {
-                return redirect(res, BASE_URL + '/auth.html?verified=1');
-            }
-
-            await dbExecute(
-                `INSERT INTO players (
-                    email, password_hash, first_name, last_name, title, bio,
-                    github, linkedin, discord, website, skills, team_status,
-                    verified, age, location, twitter_x, rednote, hackathon_history, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
-                [
-                    data.email,
-                    hashPassword(data.password),
-                    sanitizeOptional(data.firstName) || '',
-                    sanitizeOptional(data.lastName) || '',
-                    sanitizeOptional(data.title) || '',
-                    sanitizeOptional(data.bio),
-                    normalizeUrlField(data.github, 'https://github.com/'),
-                    normalizeUrlField(data.linkedin, 'https://linkedin.com/in/'),
-                    sanitizeOptional(data.discord),
-                    sanitizeOptional(data.website),
-                    sanitizeOptional(data.skills),
-                    sanitizeOptional(data.teamStatus) || 'solo',
-                    1,
-                    sanitizeOptional(data.age) || '',
-                    sanitizeOptional(data.location) || '',
-                    sanitizeOptional(data.twitterX) || '',
-                    sanitizeOptional(data.rednote) || '',
-                    sanitizeOptional(data.hackathonHistory),
-                    new Date()
-                ]
-            );
-
+            return redirect(res, BASE_URL + '/auth.html?error=token_expired');
+        }
+        const { data } = entry;
+        pending.delete(token);
+        try {
+            const existing = await findUserByEmail(data.email);
+            if (!existing) await createUserFromRegistration(data);
             return redirect(res, BASE_URL + '/auth.html?verified=1');
         } catch (err) {
             console.error('[verify]', err.message);
@@ -302,24 +448,10 @@ const server = http.createServer(async (req, res) => {
         try {
             const body = await parseBody(req);
             const { email, password } = body;
-            if (!email || !password) {
-                return json(res, 400, { error: 'Email and password are required.' });
-            }
-
-            const rows = await dbQuery(
-                `SELECT email, first_name, last_name, title, bio, github, linkedin, discord, website,
-                        skills, team_status, age, location, twitter_x, rednote, hackathon_history
-                 FROM players
-                 WHERE email = ? AND password_hash = ? AND verified = 1
-                 LIMIT 1`,
-                [email, hashPassword(password)]
-            );
-
-            if (!rows.length) {
-                return json(res, 401, { error: 'Invalid email or password.' });
-            }
-
-            return json(res, 200, { ok: true, user: mapUserRow(rows[0]) });
+            if (!email || !password) return json(res, 400, { error: 'Email and password are required.' });
+            const user = await findVerifiedUserByLogin(email, hashPassword(password));
+            if (!user) return json(res, 401, { error: 'Invalid email or password.' });
+            return json(res, 200, mapUserToResponse(user));
         } catch (err) {
             console.error('[login]', err.message);
             return json(res, 500, { error: 'Login failed. Please try again.' });
@@ -332,15 +464,9 @@ const server = http.createServer(async (req, res) => {
             const { email } = body;
             let found = null;
             for (const [tok, entry] of pending.entries()) {
-                if (entry.data.email === email) {
-                    found = { tok, entry };
-                    break;
-                }
+                if (entry.data.email === email) { found = { tok, entry }; break; }
             }
-            if (!found) {
-                return json(res, 404, { error: 'No pending registration found for this email.' });
-            }
-
+            if (!found) return json(res, 404, { error: 'No pending registration found for this email.' });
             found.entry.expiresAt = Date.now() + 24 * 60 * 60 * 1000;
             const verifyLink = BASE_URL + '/api/verify?token=' + found.tok;
             await transporter.sendMail(buildVerifyEmail(email, verifyLink));
@@ -355,15 +481,10 @@ const server = http.createServer(async (req, res) => {
         try {
             const body = await parseBody(req);
             const { email } = body;
-            if (!email) {
-                return json(res, 400, { error: 'Email is required.' });
-            }
+            if (!email) return json(res, 400, { error: 'Email is required.' });
 
-            const rows = await dbQuery(
-                'SELECT email FROM players WHERE email = ? AND verified = 1 LIMIT 1',
-                [email]
-            );
-            if (!rows.length) {
+            const user = await findUserByEmail(email);
+            if (!user || !(user.verified === true || user.verified === 1 || user.verified === 'true' || user.verified === null)) {
                 return json(res, 404, { error: 'No account found for this email. Please register first.' });
             }
 
@@ -383,41 +504,26 @@ const server = http.createServer(async (req, res) => {
         try {
             const body = await parseBody(req);
             const { email, code } = body;
-            if (!email || !code) {
-                return json(res, 400, { error: 'Email and code are required.' });
-            }
+            if (!email || !code) return json(res, 400, { error: 'Email and code are required.' });
 
             const entry = otpStore.get(email);
-            if (!entry) {
-                return json(res, 400, { error: 'No verification code found. Please request a new one.' });
-            }
+            if (!entry) return json(res, 400, { error: 'No verification code found. Please request a new one.' });
             if (Date.now() > entry.expiresAt) {
                 otpStore.delete(email);
                 return json(res, 400, { error: 'Verification code has expired. Please request a new one.' });
             }
-
-            entry.attempts += 1;
+            entry.attempts++;
             if (entry.attempts > 5) {
                 otpStore.delete(email);
                 return json(res, 429, { error: 'Too many attempts. Please request a new code.' });
             }
-
             if (entry.code !== String(code).trim()) {
                 return json(res, 400, { error: 'Incorrect code. Please try again (' + (5 - entry.attempts) + ' attempts left).' });
             }
 
             otpStore.delete(email);
-
-            const rows = await dbQuery(
-                `SELECT email, first_name, last_name, title, bio, github, linkedin, discord, website,
-                        skills, team_status, age, location, twitter_x, rednote, hackathon_history
-                 FROM players
-                 WHERE email = ?
-                 LIMIT 1`,
-                [email]
-            );
-            const user = rows[0] || { email };
-            return json(res, 200, { ok: true, user: mapUserRow(user) });
+            const user = await getProfileByEmail(email);
+            return json(res, 200, { ok: true, user: mapUserRow(user || { email }) });
         } catch (err) {
             console.error('[verify-otp]', err.message);
             return json(res, 500, { error: 'Verification failed. Please try again.' });
@@ -428,25 +534,17 @@ const server = http.createServer(async (req, res) => {
         try {
             const body = await parseBody(req);
             const { email } = body;
-            if (!email) {
-                return json(res, 400, { error: 'Email is required.' });
-            }
+            if (!email) return json(res, 400, { error: 'Email is required.' });
 
             json(res, 200, { ok: true });
-
             (async () => {
                 try {
-                    const rows = await dbQuery(
-                        'SELECT email, first_name FROM players WHERE email = ? AND verified = 1 LIMIT 1',
-                        [email]
-                    );
-                    if (!rows.length) return;
-
+                    const user = await findUserByEmail(email);
+                    if (!user || !(user.verified === true || user.verified === 1 || user.verified === 'true' || user.verified === null)) return;
                     const token = crypto.randomBytes(32).toString('hex');
                     const expiresAt = Date.now() + 60 * 60 * 1000;
                     resetStore.set(token, { email, expiresAt });
-
-                    const firstName = rows[0].first_name || 'there';
+                    const firstName = user.first_name || 'there';
                     const resetLink = BASE_URL + '/auth.html?reset_token=' + token;
                     await transporter.sendMail(buildResetPasswordEmail(email, firstName, resetLink));
                     console.log('[forgot-password] Reset email sent to', email);
@@ -465,23 +563,17 @@ const server = http.createServer(async (req, res) => {
         try {
             const body = await parseBody(req);
             const { token, password } = body;
-            if (!token || !password) {
-                return json(res, 400, { error: 'Token and password are required.' });
-            }
-            if (String(password).length < 8) {
-                return json(res, 400, { error: 'Password must be at least 8 characters.' });
-            }
+            if (!token || !password) return json(res, 400, { error: 'Token and password are required.' });
+            if (String(password).length < 8) return json(res, 400, { error: 'Password must be at least 8 characters.' });
 
             const entry = resetStore.get(token);
-            if (!entry) {
-                return json(res, 400, { error: 'Invalid or expired reset link. Please request a new one.' });
-            }
+            if (!entry) return json(res, 400, { error: 'Invalid or expired reset link. Please request a new one.' });
             if (Date.now() > entry.expiresAt) {
                 resetStore.delete(token);
                 return json(res, 400, { error: 'This reset link has expired. Please request a new one.' });
             }
 
-            await dbExecute('UPDATE players SET password_hash = ? WHERE email = ?', [hashPassword(password), entry.email]);
+            await updatePasswordByEmail(entry.email, hashPassword(password));
             resetStore.delete(token);
             console.log('[reset-password] Password updated for', entry.email);
             return json(res, 200, { ok: true, message: 'Password updated successfully.' });
@@ -494,24 +586,10 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/profile' && req.method === 'GET') {
         try {
             const email = parsed.query.email;
-            if (!email) {
-                return json(res, 400, { error: 'Email is required.' });
-            }
-
-            const rows = await dbQuery(
-                `SELECT email, first_name, last_name, title, bio, github, linkedin, discord, website,
-                        skills, team_status, age, location, twitter_x, rednote, hackathon_history
-                 FROM players
-                 WHERE email = ?
-                 LIMIT 1`,
-                [email]
-            );
-
-            if (!rows.length) {
-                return json(res, 404, { error: 'User not found.' });
-            }
-
-            return json(res, 200, mapUserRow(rows[0]));
+            if (!email) return json(res, 400, { error: 'Email is required.' });
+            const user = await getProfileByEmail(email);
+            if (!user) return json(res, 404, { error: 'User not found.' });
+            return json(res, 200, mapUserRow(user));
         } catch (err) {
             console.error('[get-profile]', err.message);
             return json(res, 500, { error: 'Failed to load profile.' });
@@ -522,46 +600,30 @@ const server = http.createServer(async (req, res) => {
         try {
             const body = await parseBody(req);
             const { email } = body;
-            if (!email) {
-                return json(res, 400, { error: 'Email is required.' });
-            }
+            if (!email) return json(res, 400, { error: 'Email is required.' });
 
             const update = {};
-            if (body.firstName !== undefined) update.first_name = String(body.firstName);
-            if (body.lastName !== undefined) update.last_name = String(body.lastName);
-            if (body.title !== undefined) update.title = String(body.title);
-            if (body.bio !== undefined) update.bio = String(body.bio);
-            if (body.github !== undefined) update.github = String(body.github);
-            if (body.linkedin !== undefined) update.linkedin = String(body.linkedin);
-            if (body.discord !== undefined) update.discord = String(body.discord);
-            if (body.website !== undefined) update.website = String(body.website);
-            if (body.skills !== undefined) update.skills = String(body.skills);
-            if (body.teamStatus !== undefined) update.team_status = String(body.teamStatus);
-            if (body.age !== undefined) update.age = String(body.age);
-            if (body.location !== undefined) update.location = String(body.location);
-            if (body.twitterX !== undefined) update.twitter_x = String(body.twitterX);
-            if (body.rednote !== undefined) update.rednote = String(body.rednote);
-            if (body.hackathonHistory !== undefined) update.hackathon_history = String(body.hackathonHistory);
+            if (body.firstName !== undefined) update.first_name = body.firstName;
+            if (body.lastName !== undefined) update.last_name = body.lastName;
+            if (body.title !== undefined) update.title = body.title;
+            if (body.bio !== undefined) update.bio = body.bio;
+            if (body.github !== undefined) update.github = body.github;
+            if (body.linkedin !== undefined) update.linkedin = body.linkedin;
+            if (body.discord !== undefined) update.discord = body.discord;
+            if (body.website !== undefined) update.website = body.website;
+            if (body.skills !== undefined) update.skills = body.skills;
+            if (body.teamStatus !== undefined) update.team_status = body.teamStatus;
+            if (body.age !== undefined) update.age = body.age;
+            if (body.location !== undefined) update.location = body.location;
+            if (body.twitterX !== undefined) update.twitter_x = body.twitterX;
+            if (body.rednote !== undefined) update.rednote = body.rednote;
+            if (body.hackathonHistory !== undefined) update.hackathon_history = body.hackathonHistory;
 
-            if (Object.keys(update).length === 0) {
-                return json(res, 400, { error: 'No fields to update.' });
-            }
-            if (update.first_name !== undefined && !update.first_name.trim()) {
-                return json(res, 400, { error: 'First name cannot be empty.' });
-            }
-            if (update.last_name !== undefined && !update.last_name.trim()) {
-                return json(res, 400, { error: 'Last name cannot be empty.' });
-            }
+            if (Object.keys(update).length === 0) return json(res, 400, { error: 'No fields to update.' });
+            if (update.first_name !== undefined && !String(update.first_name).trim()) return json(res, 400, { error: 'First name cannot be empty.' });
+            if (update.last_name !== undefined && !String(update.last_name).trim()) return json(res, 400, { error: 'Last name cannot be empty.' });
 
-            const fields = [];
-            const values = [];
-            for (const [key, value] of Object.entries(update)) {
-                fields.push(`${key} = ?`);
-                values.push(value);
-            }
-            values.push(email);
-
-            await dbExecute(`UPDATE players SET ${fields.join(', ')} WHERE email = ?`, values);
+            await updateProfileByEmail(email, update);
             console.log('[profile] Updated profile for', email);
             return json(res, 200, { ok: true });
         } catch (err) {
@@ -574,25 +636,14 @@ const server = http.createServer(async (req, res) => {
         try {
             const body = await parseBody(req);
             const { email, currentPassword, newPassword } = body;
-            if (!email || !currentPassword || !newPassword) {
-                return json(res, 400, { error: 'All fields are required.' });
-            }
-            if (String(newPassword).length < 8) {
-                return json(res, 400, { error: 'New password must be at least 8 characters.' });
-            }
-            if (currentPassword === newPassword) {
-                return json(res, 400, { error: 'New password must be different from your current password.' });
-            }
+            if (!email || !currentPassword || !newPassword) return json(res, 400, { error: 'All fields are required.' });
+            if (String(newPassword).length < 8) return json(res, 400, { error: 'New password must be at least 8 characters.' });
+            if (currentPassword === newPassword) return json(res, 400, { error: 'New password must be different from your current password.' });
 
-            const rows = await dbQuery(
-                'SELECT email FROM players WHERE email = ? AND password_hash = ? LIMIT 1',
-                [email, hashPassword(currentPassword)]
-            );
-            if (!rows.length) {
-                return json(res, 401, { error: 'Current password is incorrect.' });
-            }
+            const user = await findVerifiedUserByLogin(email, hashPassword(currentPassword));
+            if (!user) return json(res, 401, { error: 'Current password is incorrect.' });
 
-            await dbExecute('UPDATE players SET password_hash = ? WHERE email = ?', [hashPassword(newPassword), email]);
+            await updatePasswordByEmail(email, hashPassword(newPassword));
             console.log('[change-password] Password changed for', email);
             return json(res, 200, { ok: true });
         } catch (err) {
@@ -606,11 +657,19 @@ const server = http.createServer(async (req, res) => {
 
 (async () => {
     try {
-        await ensureSchema();
-        await dbQuery('SELECT 1 AS ok');
+        if (DB_PROVIDER === 'mariadb') {
+            await ensureMariaDbSchema();
+            await dbQuery('SELECT 1 AS ok');
+            console.log('[DB] MariaDB enabled at ' + DB_CONFIG.host + ':' + DB_CONFIG.port + '/' + DB_CONFIG.database);
+        } else {
+            const r = await supabaseRequest('GET', '/rest/v1/players?select=email&limit=1');
+            if (!(r.status >= 200 && r.status < 300)) {
+                throw new Error('Supabase health check failed: HTTP ' + r.status);
+            }
+            console.log('[DB] Supabase enabled at ' + SUPABASE_HOST);
+        }
         server.listen(PORT, () => {
-            console.log('[EPIC API] Listening on port ' + PORT);
-            console.log('[DB] Connected to MariaDB at ' + DB_CONFIG.host + ':' + DB_CONFIG.port + '/' + DB_CONFIG.database);
+            console.log('[EPIC API] Listening on port ' + PORT + ' with provider=' + DB_PROVIDER);
         });
     } catch (err) {
         console.error('[startup]', err.message);
